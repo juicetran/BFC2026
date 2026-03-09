@@ -36,15 +36,14 @@
         select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:9px 10px;border-radius:10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;cursor:pointer;-webkit-appearance:none;box-shadow:0 1px 3px rgba(0,0,0,.05);}
         .chip{display:inline-block;padding:2px 8px;border-radius:20px;font-size:8px;font-weight:bold;letter-spacing:.07em;text-transform:uppercase;}
         .jcard{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;border-left:3px solid transparent;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05);}
-        .jcard{border-left-width:3px;}
         ::-webkit-scrollbar{display:none;}
-
-        /* Sync status banner */
         #sync-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:100;padding:6px 16px;font-size:10px;text-align:center;letter-spacing:.06em;}
         #sync-banner.show{display:block;}
         #sync-banner.loading{background:#3a86ff22;color:#3a86ff;border-bottom:1px solid #3a86ff44;}
         #sync-banner.success{background:#2ec4b622;color:#2ec4b6;border-bottom:1px solid #2ec4b644;}
         #sync-banner.error{background:#ff475722;color:#ff4757;border-bottom:1px solid #ff475744;}
+        .skeleton{background:linear-gradient(90deg,#e8e6f5 25%,#f5f4fa 50%,#e8e6f5 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     </style>
 </head>
 <body>
@@ -57,10 +56,12 @@
         <div class="flex justify-between items-center px-4 py-3">
             <div>
                 <h1 class="fun text-2xl rb-text leading-none">Baby Formula Championship</h1>
-                <p class="text-[9px] text-[#9090b8] uppercase tracking-widest mt-0.5">2026 Season · Rd 01 · 🇦🇺 Australian GP</p>
+                <p class="text-[9px] text-[#9090b8] uppercase tracking-widest mt-0.5" id="header-subtitle">2026 Season · Loading…</p>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="syncF1Data()" id="sync-btn" title="Sync from F1 Fantasy API" style="background:#f5f4fa;border:1px solid #e2e0ee;border-radius:10px;padding:6px 10px;cursor:pointer;font-size:10px;color:#6b6b8a;font-family:'Share Tech Mono',monospace;transition:all .15s;" onmouseover="this.style.background='#e8e6f5'" onmouseout="this.style.background='#f5f4fa'">
+                <button onclick="syncData()" id="sync-btn" title="Sync from history.json"
+                    style="background:#f5f4fa;border:1px solid #e2e0ee;border-radius:10px;padding:6px 10px;cursor:pointer;font-size:10px;color:#6b6b8a;font-family:'Share Tech Mono',monospace;transition:all .15s;"
+                    onmouseover="this.style.background='#e8e6f5'" onmouseout="this.style.background='#f5f4fa'">
                     🔄 Sync
                 </button>
                 <span class="text-3xl">🏎️</span>
@@ -70,38 +71,37 @@
 
     <!-- HOME PAGE -->
     <div id="page-home" class="page active px-4 pt-5">
-        <div class="flex items-center justify-between mb-2">
+        <!-- Standings header + round dropdown -->
+        <div class="flex items-center justify-between mb-3">
             <h2 class="fun text-xl" style="color:var(--text)">Standings</h2>
-            <span class="chip" style="background:rgba(244,161,0,.15);color:#c47f00">After R01</span>
+            <div style="position:relative;width:190px;">
+                <select id="standings-round-select" onchange="renderStandings()" style="padding:5px 28px 5px 10px;font-size:10px;border-radius:10px;">
+                    <option value="overall">📊 Overall</option>
+                </select>
+                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+            </div>
         </div>
+
         <div class="flex gap-3 text-[9px] mb-2 px-1">
             <span style="color:#ff6b35">▲ gap to above</span>
             <span style="color:#d0cee8">|</span>
             <span style="color:#ff4757">◆ gap to P1</span>
         </div>
-        <div class="card overflow-hidden mb-4" id="standings-table"></div>
-
-        <div class="grid grid-cols-3 gap-2 mb-4">
-            <div class="card p-3 text-center">
-                <div class="text-xl">🏆</div>
-                <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Leader</div>
-                <div class="fun text-sm mt-0.5" style="color:var(--gold)">Kevcedes</div>
-            </div>
-            <div class="card p-3 text-center">
-                <div class="text-xl">🔥</div>
-                <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Best Race</div>
-                <div class="fun text-sm mt-0.5" style="color:#ff4757">Kevcedes</div>
-                <div class="text-[9px]" style="color:var(--muted)">240 pts</div>
-            </div>
-            <div class="card p-3 text-center">
-                <div class="text-xl">💀</div>
-                <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Worst Race</div>
-                <div class="fun text-sm mt-0.5" style="color:#c77dff">R. Juice</div>
-                <div class="text-[9px]" style="color:var(--muted)">195 pts</div>
-            </div>
+        <div class="card overflow-hidden mb-4" id="standings-table">
+            <!-- skeleton -->
+            <div class="skeleton" style="height:56px;border-radius:0;margin-bottom:1px;opacity:.5"></div>
+            <div class="skeleton" style="height:56px;border-radius:0;margin-bottom:1px;opacity:.4"></div>
+            <div class="skeleton" style="height:56px;border-radius:0;opacity:.3"></div>
         </div>
 
-        <div class="card p-4">
+        <!-- Quick stats — dynamic -->
+        <div class="grid grid-cols-3 gap-2 mb-4" id="home-stats">
+            <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
+            <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
+            <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
+        </div>
+
+        <div class="card p-4" id="home-recap">
             <h3 class="fun text-base mb-3" style="color:var(--text)">🇦🇺 Australian GP Recap</h3>
             <div class="space-y-2 text-[11px]" style="color:var(--subtext)">
                 <div class="flex gap-2"><span>🥇</span><span><span style="color:#2ec4b6;font-weight:bold">Russell wins it</span> for Mercedes — anyone with George (2x) absolutely feasted</span></div>
@@ -117,24 +117,12 @@
     <div id="page-h2h" class="page px-4 pt-5">
         <div class="flex items-center justify-between mb-4">
             <h2 class="fun text-xl" style="color:var(--text)">H2H Pulse ⚡</h2>
-            <span class="chip" style="background:rgba(58,134,255,.12);color:#3a86ff">Round 1</span>
+            <span class="chip" id="h2h-chip" style="background:rgba(58,134,255,.12);color:#3a86ff">—</span>
         </div>
         <div class="grid grid-cols-[1fr_20px_1fr] items-center gap-2 mb-4">
-            <select id="h2h-left" onchange="renderH2H()">
-                <option value="kevcedes">⚡ Kevcedes</option>
-                <option value="grahhh">🔥 GRAHHH racing</option>
-                <option value="leclaren">🧡 LeClaren F1</option>
-                <option value="juice">🍊 RACING JUICE</option>
-                <option value="thumbi">👍 Thumbi</option>
-            </select>
+            <select id="h2h-left"  onchange="renderH2H()"></select>
             <div class="text-center text-xs" style="color:var(--muted)">vs</div>
-            <select id="h2h-right" onchange="renderH2H()">
-                <option value="kevcedes">⚡ Kevcedes</option>
-                <option value="grahhh" selected>🔥 GRAHHH racing</option>
-                <option value="leclaren">🧡 LeClaren F1</option>
-                <option value="juice">🍊 RACING JUICE</option>
-                <option value="thumbi">👍 Thumbi</option>
-            </select>
+            <select id="h2h-right" onchange="renderH2H()"></select>
         </div>
         <div id="h2h-content"></div>
     </div>
@@ -153,7 +141,7 @@
     <div id="page-market" class="page px-4 pt-5">
         <div class="flex items-center justify-between mb-4">
             <h2 class="fun text-xl" style="color:var(--text)">Market 📈</h2>
-            <span class="chip" style="background:rgba(46,196,182,.12);color:#2ec4b6">Post R01</span>
+            <span class="chip" style="background:rgba(46,196,182,.12);color:#2ec4b6" id="market-chip">—</span>
         </div>
         <p class="text-[8px] uppercase tracking-widest mb-2" style="color:var(--muted)">Drivers</p>
         <div class="card overflow-hidden mb-5" id="drivers-market"></div>
@@ -165,9 +153,8 @@
     <div id="page-raws" class="page px-4 pt-5">
         <div class="flex items-center justify-between mb-3">
             <h2 class="fun text-xl" style="color:var(--text)">Raws 🗃️</h2>
-            <span class="chip" style="background:rgba(58,134,255,.12);color:#3a86ff" id="raws-race-chip">R01 Data</span>
+            <span class="chip" style="background:rgba(58,134,255,.12);color:#3a86ff" id="raws-race-chip">—</span>
         </div>
-        <!-- Controls row -->
         <div class="flex gap-2 mb-4">
             <div class="flex rounded-xl p-1 gap-1 flex-shrink-0" style="background:#f5f4fa;border:1px solid #e2e0ee">
                 <button id="raws-tab-drivers" onclick="setRawsTab('drivers')"
@@ -181,26 +168,23 @@
             </div>
             <select id="raws-race-select" onchange="renderRaws()" class="flex-1" style="padding:7px 10px">
                 <option value="overall">Overall (all races)</option>
-                <option value="R01 🇦🇺" selected>R01 · Australian GP 🇦🇺</option>
             </select>
         </div>
         <p class="text-[8px] mb-2 px-1 uppercase tracking-widest" style="color:var(--muted)">Tap column header to sort ↕</p>
-        <div class="card overflow-hidden mb-4" id="raws-table-wrap">
-            <div id="raws-table"></div>
-        </div>
+        <div class="card overflow-hidden mb-4"><div id="raws-table"></div></div>
         <div id="raws-summary"></div>
     </div>
 
     <!-- BOTTOM NAV -->
     <nav class="fixed bottom-0 left-0 right-0 flex justify-center z-50">
-        <div class="w-full max-w-[448px] backdrop-blur border-t" style="background:#f0eff4/96;border-color:#e2e0ee">
+        <div class="w-full max-w-[448px] backdrop-blur border-t" style="background:rgba(240,239,244,.96);border-color:#e2e0ee">
             <div class="rb-bar"></div>
             <div class="grid grid-cols-5 gap-1 px-2 py-2">
-                <div class="nav-btn active" onclick="navigate('home')" id="nav-home"><div class="ni">🏠</div><div class="nl">Home</div></div>
-                <div class="nav-btn" onclick="navigate('h2h')" id="nav-h2h"><div class="ni">⚡</div><div class="nl">H2H</div></div>
-                <div class="nav-btn" onclick="navigate('juice')" id="nav-juice"><div class="ni">🍊</div><div class="nl">Juice</div></div>
-                <div class="nav-btn" onclick="navigate('market')" id="nav-market"><div class="ni">📈</div><div class="nl">Market</div></div>
-                <div class="nav-btn" onclick="navigate('raws')" id="nav-raws"><div class="ni">🗃️</div><div class="nl">Raws</div></div>
+                <div class="nav-btn active" onclick="navigate('home')"   id="nav-home"><div class="ni">🏠</div><div class="nl">Home</div></div>
+                <div class="nav-btn"        onclick="navigate('h2h')"    id="nav-h2h"><div class="ni">⚡</div><div class="nl">H2H</div></div>
+                <div class="nav-btn"        onclick="navigate('juice')"  id="nav-juice"><div class="ni">🍊</div><div class="nl">Juice</div></div>
+                <div class="nav-btn"        onclick="navigate('market')" id="nav-market"><div class="ni">📈</div><div class="nl">Market</div></div>
+                <div class="nav-btn"        onclick="navigate('raws')"   id="nav-raws"><div class="ni">🗃️</div><div class="nl">Raws</div></div>
             </div>
         </div>
     </nav>
@@ -208,342 +192,405 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// DATA — auto-populated by GitHub Actions via fetch_f1_data.py
-// The sync button calls the F1 Fantasy API and updates these objects.
-// Manually update after each race if not using auto-sync.
+// STATIC CONFIG — fallback data if history.json hasn't loaded yet
 // ═══════════════════════════════════════════════════════════════════
-
-const PLAYERS = {
-    kevcedes: { id:'kevcedes', name:'Kevcedes',      owner:'Kevin Liang',    emoji:'⚡', color:'#f4a100',
-                points:240, pos:1, movement:+1, lastRace:240, value:102.4, valueDelta:+1.2 },
-    grahhh:   { id:'grahhh',   name:'GRAHHH racing', owner:'Vivian Nguyen',  emoji:'🔥', color:'#ff4757',
-                points:230, pos:2, movement:+2, lastRace:230, value:100.8, valueDelta:0 },
-    leclaren: { id:'leclaren', name:'LeClaren F1',   owner:'Selina Le Khac', emoji:'🧡', color:'#3a86ff',
-                points:222, pos:3, movement:-1, lastRace:222, value:101.5, valueDelta:+0.8 },
-    juice:    { id:'juice',    name:'RACING JUICE',  owner:'Justin Tran',    emoji:'🍊', color:'#2ec4b6',
-                points:195, pos:4, movement:-4, lastRace:195, value:99.2,  valueDelta:-0.5 },
-    thumbi:   { id:'thumbi',  name:'Thumbi',         owner:'Thomas George',  emoji:'👍', color:'#c77dff',
-                points:195, pos:4, movement:-4, lastRace:195, value:100.1, valueDelta:+0.3 },
+const PLAYER_CONFIG = {
+    kevcedes: { id:'kevcedes', name:'Kevcedes',     owner:'Kevin Liang',    emoji:'⚡', color:'#f4a100' },
+    grahhh:   { id:'grahhh',   name:'GRAHHH racing',owner:'Vivian Nguyen',  emoji:'🔥', color:'#ff4757' },
+    leclaren: { id:'leclaren', name:'LeClaren F1',  owner:'Selina Le Khac', emoji:'🧡', color:'#3a86ff' },
+    juice:    { id:'juice',    name:'RACING JUICE', owner:'Justin Tran',    emoji:'🍊', color:'#2ec4b6' },
+    thumbi:   { id:'thumbi',  name:'Thumbi',        owner:'Thomas George',  emoji:'👍', color:'#c77dff' },
 };
 
-const ORDER = ['kevcedes','grahhh','leclaren','juice','thumbi'];
-const MEDAL_COLOR = ['#f4a100','#9a9aaa','#cd7f32'];
-const MEDAL = ['🥇','🥈','🥉'];
-
-// ── MARKET DATA — price & pts synced from F1 Fantasy API ──────────
-// Prices (M = millions) come directly from the API fantasy_price field
-const DRIVERS_DATA = [
-    { name:'G. Russell',    team:'Mercedes',     price:27.4, pts:78,  delta:+0.6 },
-    { name:'K. Antonelli',  team:'Mercedes',     price:23.2, pts:44,  delta:+0.2 },
-    { name:'C. Leclerc',    team:'Ferrari',      price:26.5, pts:32,  delta:+0.3 },
-    { name:'L. Hamilton',   team:'Ferrari',      price:29.0, pts:28,  delta:+0.1 },
-    { name:'M. Verstappen', team:'Red Bull',     price:32.0, pts:38,  delta:-0.2 },
-    { name:'O. Bearman',    team:'Haas',         price:12.5, pts:20,  delta:+0.2 },
-    { name:'A. Lindblad',   team:'Racing Bulls', price:9.5,  pts:15,  delta:+0.3 },
-    { name:'L. Norris',     team:'McLaren',      price:28.0, pts:18,  delta:-0.4 },
-    { name:'I. Hadjar',     team:'Red Bull',     price:14.0, pts:-8,  delta:-0.3 },
-    { name:'O. Piastri',    team:'McLaren',      price:25.5, pts:0,   delta:-0.8 },
-    { name:'P. Gasly',      team:'Alpine',       price:15.0, pts:12,  delta:0 },
-    { name:'F. Colapinto',  team:'Alpine',       price:10.5, pts:3,   delta:0 },
-    { name:'C. Sainz',      team:'Williams',     price:22.0, pts:-4,  delta:-0.2 },
-    { name:'A. Albon',      team:'Williams',     price:14.5, pts:5,   delta:0 },
-    { name:'E. Ocon',       team:'Haas',         price:13.0, pts:6,   delta:0 },
-    { name:'N. Hulkenberg',  team:'Audi',        price:13.5, pts:0,   delta:-0.2 },
-    { name:'G. Bortoleto',  team:'Audi',         price:10.0, pts:8,   delta:+0.1 },
-    { name:'L. Lawson',     team:'Racing Bulls', price:14.5, pts:5,   delta:-0.1 },
-    { name:'F. Alonso',     team:'Aston Martin', price:20.0, pts:-5,  delta:-0.2 },
-    { name:'L. Stroll',     team:'Aston Martin', price:11.0, pts:-3,  delta:-0.1 },
-    { name:'V. Bottas',     team:'Cadillac',     price:10.5, pts:-5,  delta:-0.1 },
-    { name:'S. Perez',      team:'Cadillac',     price:11.0, pts:2,   delta:0 },
-];
-
-const CONSTRUCTORS_DATA = [
-    { name:'Mercedes',     price:34.5, pts:96, delta:+0.8 },
-    { name:'Ferrari',      price:30.5, pts:42, delta:+0.5 },
-    { name:'Red Bull',     price:27.0, pts:-3, delta:-0.1 },
-    { name:'McLaren',      price:28.5, pts:-5, delta:-0.3 },
-    { name:'Aston Martin', price:19.0, pts:-8, delta:-0.2 },
-    { name:'Alpine',       price:13.0, pts:15, delta:+0.1 },
-    { name:'Williams',     price:14.5, pts:1,  delta:-0.1 },
-    { name:'Haas',         price:13.5, pts:34, delta:+0.3 },
-    { name:'Audi',         price:11.0, pts:8,  delta:+0.1 },
-    { name:'Racing Bulls', price:12.5, pts:20, delta:+0.2 },
-    { name:'Cadillac',     price:8.5,  pts:-3, delta:0 },
-];
-
 const JUICEBOARD_DATA = [
-    { emoji:'👑', title:'King of the Grid', subject:'Kevcedes', color:'#f4a100', tag:'W of the Week',
+    { emoji:'👑', title:'King of the Grid',       subject:'Kevcedes',          color:'#f4a100', tag:'W of the Week',
       text:"Kevin built the best team and it wasn't even close. Russell 2x star scoring 78, Bearman 20, Lindblad 15 on debut, 240 total. This man is playing F1 Fantasy in 4D chess while everyone else is playing draughts." },
-    { emoji:'🪦', title:'Piastri DNS Pain Award', subject:'RACING JUICE', color:'#ff4757', tag:'Certified L',
+    { emoji:'🪦', title:'Piastri DNS Pain Award', subject:'RACING JUICE',      color:'#ff4757', tag:'Certified L',
       text:"Justin's star pick crashed on the sighting lap before the race even started. Zero points from your main man. That's not bad luck — that's cosmically targeted suffering. Prayers." },
-    { emoji:'📉', title:'Hadjar Did WHAT Now?', subject:'Anyone with Hadjar', color:'#c77dff', tag:'Minus Points',
+    { emoji:'📉', title:'Hadjar Did WHAT Now?',   subject:'Anyone with Hadjar', color:'#c77dff', tag:'Minus Points',
       text:"-8 points. NEGATIVE EIGHT. Isack Hadjar out here actively destroying fantasy teams. DNF lap 11, power unit in flames. If Hadjar were a stock, the SEC would investigate it as deliberate market manipulation." },
-    { emoji:'🚀', title:'P20 to P6', subject:'Verstappen owners', color:'#f4a100', tag:'Recovery Drive',
+    { emoji:'🚀', title:'P20 to P6',              subject:'Verstappen owners', color:'#f4a100', tag:'Recovery Drive',
       text:"Max crashed in qualifying, started last, finished P6. 14 positions gained in one race. Whoever had Verstappen picked up an absolute haul of overtake points. A reminder that Max in a fast car is just cosmically unfair." },
-    { emoji:'🌟', title:'Rookie on Debut', subject:'Arvid Lindblad', color:'#2ec4b6', tag:'Sleeper Hit',
+    { emoji:'🌟', title:'Rookie on Debut',        subject:'Arvid Lindblad',    color:'#2ec4b6', tag:'Sleeper Hit',
       text:"15 points, P8 finish, 18 years old, first F1 race. Third youngest driver ever to score F1 points. Whoever grabbed Lindblad early is eating well while the rest panic-sell Piastri." },
-    { emoji:'🧠', title:'Galaxy Brain Mode', subject:'LeClaren F1', color:'#3a86ff', tag:'Mysterious',
+    { emoji:'🧠', title:'Galaxy Brain Mode',      subject:'LeClaren F1',       color:'#3a86ff', tag:'Mysterious',
       text:"Selina has $101.5M in team value and still DROPS a position. The car is fast, the logic is elusive. We respect the process even if we don't understand the process." },
 ];
 
-// ═══════════════════════════════════════════════════
-// RAW F1 FANTASY DATA
-// Prices auto-synced from F1 Fantasy API fantasy_price field
-// Add new entry to each driver's `races` array after each round
-// ═══════════════════════════════════════════════════
-const RAW_DRIVERS = [
-  // --- Mercedes ---
-  { name:'G. Russell',    full:'George Russell',    team:'Mercedes',       price:27.4, sel:41.2, delta:+0.6, races:[{r:'R01 🇦🇺',pts:78}] },
-  { name:'K. Antonelli',  full:'Kimi Antonelli',    team:'Mercedes',       price:23.2, sel:28.7, delta:+0.2, races:[{r:'R01 🇦🇺',pts:44}] },
-  // --- Ferrari ---
-  { name:'L. Hamilton',   full:'Lewis Hamilton',    team:'Ferrari',        price:29.0, sel:35.4, delta:+0.1, races:[{r:'R01 🇦🇺',pts:28}] },
-  { name:'C. Leclerc',    full:'Charles Leclerc',   team:'Ferrari',        price:26.5, sel:30.1, delta:+0.3, races:[{r:'R01 🇦🇺',pts:32}] },
-  // --- Red Bull ---
-  { name:'M. Verstappen', full:'Max Verstappen',    team:'Red Bull',       price:32.0, sel:38.9, delta:-0.2, races:[{r:'R01 🇦🇺',pts:38}] },
-  { name:'I. Hadjar',     full:'Isack Hadjar',      team:'Red Bull',       price:14.0, sel:12.3, delta:-0.3, races:[{r:'R01 🇦🇺',pts:-8}] },
-  // --- McLaren ---
-  { name:'L. Norris',     full:'Lando Norris',      team:'McLaren',        price:28.0, sel:29.5, delta:-0.4, races:[{r:'R01 🇦🇺',pts:18}] },
-  { name:'O. Piastri',    full:'Oscar Piastri',     team:'McLaren',        price:25.5, sel:26.2, delta:-0.8, races:[{r:'R01 🇦🇺',pts:0}] },
-  // --- Aston Martin ---
-  { name:'F. Alonso',     full:'Fernando Alonso',   team:'Aston Martin',   price:20.0, sel:18.6, delta:-0.2, races:[{r:'R01 🇦🇺',pts:-5}] },
-  { name:'L. Stroll',     full:'Lance Stroll',      team:'Aston Martin',   price:11.0, sel:7.2,  delta:-0.1, races:[{r:'R01 🇦🇺',pts:-3}] },
-  // --- Alpine ---
-  { name:'P. Gasly',      full:'Pierre Gasly',      team:'Alpine',         price:15.0, sel:14.3, delta:0,    races:[{r:'R01 🇦🇺',pts:12}] },
-  { name:'F. Colapinto',  full:'Franco Colapinto',  team:'Alpine',         price:10.5, sel:9.8,  delta:0,    races:[{r:'R01 🇦🇺',pts:3}] },
-  // --- Williams ---
-  { name:'C. Sainz',      full:'Carlos Sainz',      team:'Williams',       price:22.0, sel:22.8, delta:-0.2, races:[{r:'R01 🇦🇺',pts:-4}] },
-  { name:'A. Albon',      full:'Alex Albon',        team:'Williams',       price:14.5, sel:11.3, delta:0,    races:[{r:'R01 🇦🇺',pts:5}] },
-  // --- Haas ---
-  { name:'O. Bearman',    full:'Oliver Bearman',    team:'Haas',           price:12.5, sel:16.4, delta:+0.2, races:[{r:'R01 🇦🇺',pts:20}] },
-  { name:'E. Ocon',       full:'Esteban Ocon',      team:'Haas',           price:13.0, sel:10.5, delta:0,    races:[{r:'R01 🇦🇺',pts:6}] },
-  // --- Audi ---
-  { name:'N. Hulkenberg',  full:'Nico Hulkenberg',  team:'Audi',           price:13.5, sel:8.9,  delta:-0.2, races:[{r:'R01 🇦🇺',pts:0}] },
-  { name:'G. Bortoleto',  full:'Gabriel Bortoleto', team:'Audi',           price:10.0, sel:6.3,  delta:+0.1, races:[{r:'R01 🇦🇺',pts:8}] },
-  // --- Racing Bulls ---
-  { name:'L. Lawson',     full:'Liam Lawson',       team:'Racing Bulls',   price:14.5, sel:11.2, delta:-0.1, races:[{r:'R01 🇦🇺',pts:5}] },
-  { name:'A. Lindblad',   full:'Arvid Lindblad',    team:'Racing Bulls',   price:9.5,  sel:22.1, delta:+0.3, races:[{r:'R01 🇦🇺',pts:15}] },
-  // --- Cadillac ---
-  { name:'V. Bottas',     full:'Valtteri Bottas',   team:'Cadillac',       price:10.5, sel:5.1,  delta:-0.1, races:[{r:'R01 🇦🇺',pts:-5}] },
-  { name:'S. Perez',      full:'Sergio Perez',      team:'Cadillac',       price:11.0, sel:4.8,  delta:0,    races:[{r:'R01 🇦🇺',pts:2}] },
-];
+const TEAM_COLORS = {
+    'Mercedes':'#00d2be','Ferrari':'#e8002d','Red Bull':'#3671c6',
+    'McLaren':'#ff8000','Aston Martin':'#358c75','Alpine':'#0093cc',
+    'Williams':'#005aff','Haas':'#888888','Audi':'#52e252',
+    'Racing Bulls':'#6692ff','Cadillac':'#cc0000',
+};
 
-const RAW_CONSTRUCTORS = [
-  { name:'Mercedes',     price:34.5, sel:29.8, delta:+0.8, races:[{r:'R01 🇦🇺',pts:96}] },
-  { name:'Ferrari',      price:30.5, sel:24.2, delta:+0.5, races:[{r:'R01 🇦🇺',pts:42}] },
-  { name:'Red Bull',     price:27.0, sel:20.1, delta:-0.1, races:[{r:'R01 🇦🇺',pts:-3}] },
-  { name:'McLaren',      price:28.5, sel:18.7, delta:-0.3, races:[{r:'R01 🇦🇺',pts:-5}] },
-  { name:'Aston Martin', price:19.0, sel:12.4, delta:-0.2, races:[{r:'R01 🇦🇺',pts:-8}] },
-  { name:'Alpine',       price:13.0, sel:8.6,  delta:+0.1, races:[{r:'R01 🇦🇺',pts:15}] },
-  { name:'Williams',     price:14.5, sel:10.3, delta:-0.1, races:[{r:'R01 🇦🇺',pts:1}] },
-  { name:'Haas',         price:13.5, sel:9.2,  delta:+0.3, races:[{r:'R01 🇦🇺',pts:34}] },
-  { name:'Audi',         price:11.0, sel:5.4,  delta:+0.1, races:[{r:'R01 🇦🇺',pts:8}] },
-  { name:'Racing Bulls', price:12.5, sel:7.1,  delta:+0.2, races:[{r:'R01 🇦🇺',pts:20}] },
-  { name:'Cadillac',     price:8.5,  sel:3.2,  delta:0,    races:[{r:'R01 🇦🇺',pts:-3}] },
-];
+const MEDAL_COLOR = ['#f4a100','#9a9aaa','#cd7f32'];
+const MEDAL       = ['🥇','🥈','🥉'];
 
-// ═══════════════════════════════════════════════════
-// F1 FANTASY API SYNC
-// Mirrors fetch_f1_data.py / f1_sync.yml logic in the browser.
-// Requires a CORS proxy or use the GitHub Actions auto-sync.
-// Reads from data.json if present (committed by GitHub Actions).
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// APP STATE — populated from history.json
+// ═══════════════════════════════════════════════════════════════════
+let DB          = null;   // full history.json object
+let ROUNDS      = [];     // DB.rounds array, sorted
+let PLAYERS     = {};     // merged PLAYER_CONFIG + live data
+let rawsMode    = 'drivers';
+let rawsSort    = { col:'pts', dir:-1 };
 
-async function syncF1Data() {
+// ═══════════════════════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════════════════════
+async function syncData() {
     const banner = document.getElementById('sync-banner');
-    const btn = document.getElementById('sync-btn');
+    const btn    = document.getElementById('sync-btn');
+
     const showBanner = (type, msg) => {
         banner.className = `show ${type}`;
         banner.textContent = msg;
         if (type !== 'loading') setTimeout(() => banner.classList.remove('show'), 3500);
     };
 
-    showBanner('loading', '🔄 Syncing from F1 Fantasy API…');
-    btn.textContent = '⏳ Syncing…';
-    btn.disabled = true;
+    showBanner('loading', '🔄 Loading history.json…');
+    btn.textContent = '⏳ Loading…';
+    btn.disabled    = true;
 
     try {
-        // Try to load data.json committed by GitHub Actions
-        const res = await fetch('./data.json', { cache: 'no-cache' });
+        const res = await fetch('./history.json', { cache:'no-cache' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        applyLeagueData(data);
-        showBanner('success', `✅ Synced! Last updated: ${new Date().toLocaleTimeString()}`);
+        DB = await res.json();
+        applyHistory(DB);
+        showBanner('success', `✅ Synced! ${ROUNDS.length} round(s) loaded · ${new Date().toLocaleTimeString()}`);
     } catch (err) {
         console.warn('Sync error:', err);
-        showBanner('error', `⚠️ Sync failed — using cached data. Run GitHub Action to update.`);
+        showBanner('error', '⚠️ Could not load history.json — using seed data.');
+        applyHistory(null);
     } finally {
         btn.textContent = '🔄 Sync';
-        btn.disabled = false;
+        btn.disabled    = false;
     }
 }
 
-/**
- * applyLeagueData(data)
- * Maps the F1 Fantasy API response (from fetch_f1_data.py) onto the app's
- * data structures. The API returns a league object with standings & player
- * picks that include fantasy_price (in 100k units), total_points, etc.
- *
- * API response shape (from /partner_games/f1/leagues/:id):
- * {
- *   data: {
- *     standings: [
- *       { player_name, total_points, team_value, picks: [
- *           { first_name, last_name, team_name, fantasy_price, is_constructor,
- *             total_season_score, selection_percentage_game_week }
- *         ]
- *       }
- *     ]
- *   }
- * }
- */
-function applyLeagueData(apiData) {
-    try {
-        const standings = apiData?.data?.standings;
-        if (!standings || !standings.length) return;
+function applyHistory(db) {
+    // Merge player registry
+    PLAYERS = { ...PLAYER_CONFIG };
+    if (db?.players) {
+        Object.entries(db.players).forEach(([k, v]) => {
+            if (PLAYERS[k]) PLAYERS[k] = { ...PLAYERS[k], ...v };
+        });
+    }
 
-        // Update player points & team values from API standings
-        standings.forEach(standing => {
-            const playerName = (standing.player_name || '').toLowerCase().trim();
-            const playerKey = Object.keys(PLAYERS).find(k =>
-                PLAYERS[k].owner.toLowerCase().includes(playerName) ||
-                playerName.includes(PLAYERS[k].owner.toLowerCase().split(' ')[0].toLowerCase()) ||
-                playerName.includes(k)
-            );
-            if (playerKey) {
-                PLAYERS[playerKey].points    = standing.total_points ?? PLAYERS[playerKey].points;
-                PLAYERS[playerKey].value     = standing.team_value   ? +(standing.team_value / 1e6).toFixed(1) : PLAYERS[playerKey].value;
-                PLAYERS[playerKey].lastRace  = standing.last_race_points ?? PLAYERS[playerKey].lastRace;
-            }
+    // Load rounds
+    ROUNDS = db?.rounds ? [...db.rounds].sort((a,b) => a.round - b.round) : [];
 
-            // Update driver/constructor prices from picks
-            const picks = standing.picks || [];
-            picks.forEach(pick => {
-                const priceMillion = pick.fantasy_price ? +(pick.fantasy_price / 1e6).toFixed(1) : null;
-                const fullName = `${pick.first_name || ''} ${pick.last_name || ''}`.trim();
-                const shortName = pick.last_name || fullName;
+    // If no rounds from DB, seed with R01 fallback
+    if (!ROUNDS.length) ROUNDS = [SEED_ROUND];
 
-                if (pick.is_constructor) {
-                    const ctor = RAW_CONSTRUCTORS.find(c =>
-                        c.name.toLowerCase().includes(shortName.toLowerCase()) ||
-                        shortName.toLowerCase().includes(c.name.toLowerCase())
-                    );
-                    if (ctor && priceMillion) {
-                        ctor.price = priceMillion;
-                        // Mirror to CONSTRUCTORS_DATA
-                        const md = CONSTRUCTORS_DATA.find(c => c.name === ctor.name);
-                        if (md) md.price = priceMillion;
-                    }
-                } else {
-                    const drv = RAW_DRIVERS.find(d =>
-                        d.full.toLowerCase().includes(shortName.toLowerCase()) ||
-                        shortName.toLowerCase().includes(d.name.split('.')[1]?.trim().toLowerCase() || '')
-                    );
-                    if (drv && priceMillion) {
-                        drv.price = priceMillion;
-                        // Mirror to DRIVERS_DATA
-                        const md = DRIVERS_DATA.find(d => d.name === drv.name);
-                        if (md) md.price = priceMillion;
-                    }
-                    // Sync selection % if provided
-                    if (pick.selection_percentage_game_week != null && drv) {
-                        drv.sel = +pick.selection_percentage_game_week.toFixed(1);
-                    }
-                }
+    // Populate round dropdowns
+    populateRoundDropdowns();
+
+    // Update header subtitle
+    const latest = ROUNDS[ROUNDS.length - 1];
+    document.getElementById('header-subtitle').textContent =
+        `2026 Season · ${latest.key} · ${latest.gp} ${latest.flag}`;
+
+    // Render all sections
+    renderStandings();
+    renderH2H();
+    renderJuice();
+    renderMarket();
+    renderRaws();
+}
+
+// Seed round — used if history.json not yet available
+const SEED_ROUND = {
+    round:1, key:'R01', label:'R01 · Australian GP 🇦🇺', flag:'🇦🇺', gp:'Australian GP', date:'2026-03-16',
+    standings:[
+        {player_key:'kevcedes',player_name:'Kevcedes',    owner:'Kevin Liang',    points:240,race_points:240,team_value:102.4},
+        {player_key:'grahhh',  player_name:'GRAHHH racing',owner:'Vivian Nguyen',  points:230,race_points:230,team_value:100.8},
+        {player_key:'leclaren',player_name:'LeClaren F1', owner:'Selina Le Khac', points:222,race_points:222,team_value:101.5},
+        {player_key:'juice',   player_name:'RACING JUICE',owner:'Justin Tran',    points:195,race_points:195,team_value:99.2},
+        {player_key:'thumbi',  player_name:'Thumbi',      owner:'Thomas George',  points:195,race_points:195,team_value:100.1},
+    ],
+    drivers:[
+        {name:'G. Russell',   full:'George Russell',   team:'Mercedes',     price:27.4,pts:78, delta:0.6, sel:41.2},
+        {name:'K. Antonelli', full:'Kimi Antonelli',   team:'Mercedes',     price:23.2,pts:44, delta:0.2, sel:28.7},
+        {name:'C. Leclerc',   full:'Charles Leclerc',  team:'Ferrari',      price:26.5,pts:32, delta:0.3, sel:30.1},
+        {name:'L. Hamilton',  full:'Lewis Hamilton',   team:'Ferrari',      price:29.0,pts:28, delta:0.1, sel:35.4},
+        {name:'M. Verstappen',full:'Max Verstappen',   team:'Red Bull',     price:32.0,pts:38, delta:-0.2,sel:38.9},
+        {name:'I. Hadjar',    full:'Isack Hadjar',     team:'Red Bull',     price:14.0,pts:-8, delta:-0.3,sel:12.3},
+        {name:'L. Norris',    full:'Lando Norris',     team:'McLaren',      price:28.0,pts:18, delta:-0.4,sel:29.5},
+        {name:'O. Piastri',   full:'Oscar Piastri',    team:'McLaren',      price:25.5,pts:0,  delta:-0.8,sel:26.2},
+        {name:'F. Alonso',    full:'Fernando Alonso',  team:'Aston Martin', price:20.0,pts:-5, delta:-0.2,sel:18.6},
+        {name:'L. Stroll',    full:'Lance Stroll',     team:'Aston Martin', price:11.0,pts:-3, delta:-0.1,sel:7.2},
+        {name:'P. Gasly',     full:'Pierre Gasly',     team:'Alpine',       price:15.0,pts:12, delta:0,   sel:14.3},
+        {name:'F. Colapinto', full:'Franco Colapinto', team:'Alpine',       price:10.5,pts:3,  delta:0,   sel:9.8},
+        {name:'C. Sainz',     full:'Carlos Sainz',     team:'Williams',     price:22.0,pts:-4, delta:-0.2,sel:22.8},
+        {name:'A. Albon',     full:'Alex Albon',       team:'Williams',     price:14.5,pts:5,  delta:0,   sel:11.3},
+        {name:'O. Bearman',   full:'Oliver Bearman',   team:'Haas',         price:12.5,pts:20, delta:0.2, sel:16.4},
+        {name:'E. Ocon',      full:'Esteban Ocon',     team:'Haas',         price:13.0,pts:6,  delta:0,   sel:10.5},
+        {name:'N. Hulkenberg',full:'Nico Hulkenberg',  team:'Audi',         price:13.5,pts:0,  delta:-0.2,sel:8.9},
+        {name:'G. Bortoleto', full:'Gabriel Bortoleto',team:'Audi',         price:10.0,pts:8,  delta:0.1, sel:6.3},
+        {name:'L. Lawson',    full:'Liam Lawson',      team:'Racing Bulls',  price:14.5,pts:5,  delta:-0.1,sel:11.2},
+        {name:'A. Lindblad',  full:'Arvid Lindblad',   team:'Racing Bulls',  price:9.5, pts:15, delta:0.3, sel:22.1},
+        {name:'V. Bottas',    full:'Valtteri Bottas',  team:'Cadillac',     price:10.5,pts:-5, delta:-0.1,sel:5.1},
+        {name:'S. Perez',     full:'Sergio Perez',     team:'Cadillac',     price:11.0,pts:2,  delta:0,   sel:4.8},
+    ],
+    constructors:[
+        {name:'Mercedes',     price:34.5,pts:96, delta:0.8, sel:29.8},
+        {name:'Ferrari',      price:30.5,pts:42, delta:0.5, sel:24.2},
+        {name:'Red Bull',     price:27.0,pts:-3, delta:-0.1,sel:20.1},
+        {name:'McLaren',      price:28.5,pts:-5, delta:-0.3,sel:18.7},
+        {name:'Aston Martin', price:19.0,pts:-8, delta:-0.2,sel:12.4},
+        {name:'Alpine',       price:13.0,pts:15, delta:0.1, sel:8.6},
+        {name:'Williams',     price:14.5,pts:1,  delta:-0.1,sel:10.3},
+        {name:'Haas',         price:13.5,pts:34, delta:0.3, sel:9.2},
+        {name:'Audi',         price:11.0,pts:8,  delta:0.1, sel:5.4},
+        {name:'Racing Bulls', price:12.5,pts:20, delta:0.2, sel:7.1},
+        {name:'Cadillac',     price:8.5, pts:-3, delta:0,   sel:3.2},
+    ],
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// ROUND DROPDOWN HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function populateRoundDropdowns() {
+    // Standings dropdown
+    const sSelect = document.getElementById('standings-round-select');
+    sSelect.innerHTML = '<option value="overall">📊 Overall</option>';
+    [...ROUNDS].reverse().forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.round;
+        opt.textContent = r.label;
+        sSelect.appendChild(opt);
+    });
+    // Default to latest round
+    if (ROUNDS.length) sSelect.value = ROUNDS[ROUNDS.length - 1].round;
+
+    // Raws dropdown
+    const rSelect = document.getElementById('raws-race-select');
+    rSelect.innerHTML = '<option value="overall">Overall (all races)</option>';
+    [...ROUNDS].reverse().forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.round;
+        opt.textContent = r.label;
+        rSelect.appendChild(opt);
+    });
+    if (ROUNDS.length) rSelect.value = ROUNDS[ROUNDS.length - 1].round;
+
+    // H2H dropdowns — player names
+    ['h2h-left','h2h-right'].forEach((id, i) => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = Object.values(PLAYERS).map((p,idx) =>
+            `<option value="${p.id}" ${i === 1 && idx === 1 ? 'selected' : ''}>${p.emoji} ${p.name}</option>`
+        ).join('');
+    });
+}
+
+// ─── Get standings for a given round selection ─────────────────────
+// Returns array sorted by points desc, with pos, movement, gapAbove, gapP1
+function getStandingsForView(roundVal) {
+    const isOverall = roundVal === 'overall';
+
+    if (isOverall) {
+        // Sum points across all rounds
+        const totals = {};
+        Object.keys(PLAYERS).forEach(k => { totals[k] = { points:0, race_points:0, team_value:0 }; });
+        ROUNDS.forEach(r => {
+            r.standings.forEach(s => {
+                if (!totals[s.player_key]) totals[s.player_key] = { points:0, race_points:0, team_value:0 };
+                totals[s.player_key].points      += s.points;
+                totals[s.player_key].race_points  = s.race_points; // latest race
+                totals[s.player_key].team_value   = s.team_value;  // latest value
             });
         });
-
-        // Re-sort standings by points
-        const sorted = Object.values(PLAYERS).sort((a,b) => b.points - a.points);
-        sorted.forEach((p, i) => {
-            const oldPos = PLAYERS[p.id].pos;
-            PLAYERS[p.id].pos = i + 1;
-            PLAYERS[p.id].movement = oldPos - (i + 1); // positive = moved up
-        });
-        ORDER.sort((a,b) => PLAYERS[a].pos - PLAYERS[b].pos);
-
-        // Re-render all pages with fresh data
-        renderStandings();
-        renderH2H();
-        renderMarket();
-        renderRaws();
-    } catch(e) {
-        console.warn('applyLeagueData error:', e);
+        return Object.entries(totals)
+            .map(([k, v]) => ({ player_key:k, points:v.points, race_points:v.race_points, team_value:v.team_value }))
+            .sort((a,b) => b.points - a.points)
+            .map((s, i, arr) => ({
+                ...s,
+                pos:       i + 1,
+                movement:  0,
+                gapAbove:  i > 0 ? s.points - arr[i-1].points : null,
+                gapP1:     s.points - arr[0].points,
+            }));
     }
+
+    // Single round
+    const round = ROUNDS.find(r => r.round === parseInt(roundVal));
+    if (!round) return [];
+
+    // Previous round for movement
+    const prevRound = ROUNDS.find(r => r.round === round.round - 1);
+
+    return round.standings.map((s, i, arr) => {
+        let movement = 0;
+        if (prevRound) {
+            const prevStandings = prevRound.standings;
+            // Overall points up to this round
+            const overallSorted = computeOverallAtRound(round.round);
+            const prevOverall   = computeOverallAtRound(round.round - 1);
+            const oldPos = prevOverall.findIndex(x => x.player_key === s.player_key);
+            const newPos = overallSorted.findIndex(x => x.player_key === s.player_key);
+            movement = oldPos >= 0 ? oldPos - newPos : 0;
+        }
+        return {
+            ...s,
+            pos:      i + 1,
+            movement,
+            gapAbove: i > 0 ? s.points - arr[i-1].points : null,
+            gapP1:    s.points - arr[0].points,
+        };
+    });
 }
 
-// ═══════════════════════════════════════════════════
-// RENDER FUNCTIONS
-// ═══════════════════════════════════════════════════
+function computeOverallAtRound(maxRound) {
+    const totals = {};
+    ROUNDS.filter(r => r.round <= maxRound).forEach(r => {
+        r.standings.forEach(s => {
+            if (!totals[s.player_key]) totals[s.player_key] = 0;
+            totals[s.player_key] += s.points;
+        });
+    });
+    return Object.entries(totals)
+        .map(([k,v]) => ({ player_key:k, points:v }))
+        .sort((a,b) => b.points - a.points);
+}
 
+// ═══════════════════════════════════════════════════════════════════
+// RENDER — STANDINGS
+// ═══════════════════════════════════════════════════════════════════
 function renderStandings() {
+    const roundVal  = document.getElementById('standings-round-select').value;
+    const isOverall = roundVal === 'overall';
+    const standings = getStandingsForView(roundVal);
+    if (!standings.length) return;
+
     const el = document.getElementById('standings-table');
-    let html = '';
-    ORDER.forEach((key, i) => {
-        const p = PLAYERS[key];
-        const prev = i > 0 ? PLAYERS[ORDER[i-1]] : null;
-        const gapAbove = prev ? p.points - prev.points : null;
-        const gapP1    = p.points - PLAYERS[ORDER[0]].points;
-        const mc = i < 3 ? MEDAL_COLOR[i] : p.color;
-        const movArrow = p.movement > 0 ? '↑' : p.movement < 0 ? '↓' : '—';
-        const movColor = p.movement > 0 ? '#2ec4b6' : p.movement < 0 ? '#ff4757' : '#9090b8';
-        const movAbs   = Math.abs(p.movement);
-        html += `
+    el.innerHTML = standings.map((s, i) => {
+        const p       = PLAYERS[s.player_key] || {};
+        const mc      = i < 3 ? MEDAL_COLOR[i] : (p.color || '#aaa');
+        const movArrow = s.movement > 0 ? '↑' : s.movement < 0 ? '↓' : '—';
+        const movColor = s.movement > 0 ? '#2ec4b6' : s.movement < 0 ? '#ff4757' : '#9090b8';
+        const movAbs   = Math.abs(s.movement);
+
+        // Points label — race pts for single round, total for overall
+        const ptsLabel = isOverall
+            ? `${s.points}`
+            : `${s.race_points ?? s.points}`;
+
+        return `
         <div class="prow px-4 py-3 flex items-center gap-3" style="border-left:3px solid ${mc};animation-delay:${i*0.05}s">
             <div class="w-7 text-center flex-shrink-0">
                 ${i < 3
                     ? `<span class="text-xl leading-none">${MEDAL[i]}</span>`
-                    : `<span class="fun text-base" style="color:${p.color}">${p.pos}</span>`}
+                    : `<span class="fun text-base" style="color:${p.color}">${s.pos}</span>`}
             </div>
             <div class="flex-1 min-w-0">
-                <div class="fun text-[15px] leading-tight truncate" style="color:${p.color}">${p.name}</div>
-                <div class="text-[9px] truncate" style="color:var(--subtext)">${p.owner}</div>
+                <div class="fun text-[15px] leading-tight truncate" style="color:${p.color || '#aaa'}">${p.name || s.player_key}</div>
+                <div class="text-[9px] truncate" style="color:var(--subtext)">${p.owner || ''}</div>
             </div>
             <div class="text-right flex-shrink-0">
-                <div class="fun text-base leading-none" style="color:${mc}">${p.points}</div>
+                <div class="fun text-base leading-none" style="color:${mc}">${ptsLabel}</div>
                 ${i === 0
                     ? `<div class="text-[9px] font-bold mt-0.5" style="color:var(--gold)">LEADER</div>`
                     : `<div class="text-[9px] mt-0.5 font-mono">
-                           <span style="color:#ff6b35">${gapAbove}</span>
+                           <span style="color:#ff6b35">${s.gapAbove ?? ''}</span>
                            <span style="color:#d0cee8"> | </span>
-                           <span style="color:#ff4757">${gapP1}</span>
+                           <span style="color:#ff4757">${s.gapP1}</span>
                        </div>`}
             </div>
             <div class="w-7 text-center flex-shrink-0">
                 <span class="text-xs font-bold" style="color:${movColor}">${movArrow}${movAbs > 0 ? movAbs : ''}</span>
             </div>
         </div>`;
-    });
-    el.innerHTML = html;
+    }).join('');
+
+    // Update quick-stats cards
+    const latest      = ROUNDS[ROUNDS.length - 1];
+    const topS        = standings[0];
+    const topP        = PLAYERS[topS.player_key] || {};
+    const racePts     = isOverall
+        ? latest?.standings?.slice().sort((a,b) => b.race_points - a.race_points)
+        : standings.slice().sort((a,b) => (b.race_points??0) - (a.race_points??0));
+    const bestS  = racePts?.[0];
+    const bestP  = PLAYERS[bestS?.player_key] || {};
+    const worstS = racePts?.[racePts.length - 1];
+    const worstP = PLAYERS[worstS?.player_key] || {};
+
+    document.getElementById('home-stats').innerHTML = `
+        <div class="card p-3 text-center">
+            <div class="text-xl">🏆</div>
+            <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Leader</div>
+            <div class="fun text-sm mt-0.5" style="color:var(--gold)">${topP.name || '—'}</div>
+            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${topS.points} pts</div>
+        </div>
+        <div class="card p-3 text-center">
+            <div class="text-xl">🔥</div>
+            <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Best ${isOverall ? 'Total' : 'Race'}</div>
+            <div class="fun text-sm mt-0.5" style="color:#ff4757">${bestP.name || '—'}</div>
+            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${bestS?.race_points ?? bestS?.points ?? '—'} pts</div>
+        </div>
+        <div class="card p-3 text-center">
+            <div class="text-xl">💀</div>
+            <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Worst ${isOverall ? 'Total' : 'Race'}</div>
+            <div class="fun text-sm mt-0.5" style="color:#c77dff">${worstP.name || '—'}</div>
+            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${worstS?.race_points ?? worstS?.points ?? '—'} pts</div>
+        </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// RENDER — H2H
+// ═══════════════════════════════════════════════════════════════════
 function renderH2H() {
     const lk = document.getElementById('h2h-left').value;
     const rk = document.getElementById('h2h-right').value;
     const L  = PLAYERS[lk];
     const R  = PLAYERS[rk];
     const el = document.getElementById('h2h-content');
+    if (!L || !R) return;
 
-    const row = (label, lv, rv, fmt) => {
+    // Get overall points for each player
+    const getOverall = (key) => ROUNDS.reduce((sum, r) => {
+        const s = r.standings.find(x => x.player_key === key);
+        return sum + (s ? s.points : 0);
+    }, 0);
+    const getLatestRace = (key) => {
+        const latest = ROUNDS[ROUNDS.length - 1];
+        const s = latest?.standings.find(x => x.player_key === key);
+        return s?.race_points ?? 0;
+    };
+    const getLatestValue = (key) => {
+        const latest = ROUNDS[ROUNDS.length - 1];
+        const s = latest?.standings.find(x => x.player_key === key);
+        return s?.team_value ?? 0;
+    };
+    const getPos = (key) => {
+        const overall = computeOverallAtRound(ROUNDS[ROUNDS.length - 1]?.round ?? 1);
+        return overall.findIndex(x => x.player_key === key) + 1;
+    };
+
+    const Lpts = getOverall(lk), Rpts = getOverall(rk);
+    const gap  = Math.abs(Lpts - Rpts);
+    const tied = Lpts === Rpts;
+    const ahead = Lpts >= Rpts ? L : R;
+    const latest = ROUNDS[ROUNDS.length - 1];
+
+    document.getElementById('h2h-chip').textContent = latest ? latest.key : '—';
+
+    const row = (label, lv, rv, fmtL, fmtR) => {
         const lWin = lv > rv, rWin = rv > lv;
-        const lStr = fmt ? fmt(lv, L) : lv;
-        const rStr = fmt ? fmt(rv, R) : rv;
         return `
         <div class="flex items-center gap-2 py-2.5 border-b last:border-0" style="border-color:var(--border)">
-            <div class="flex-1 text-right font-mono text-xs ${lWin ? 'font-bold' : ''}" style="${lWin ? `color:${L.color}` : 'color:var(--muted)'}">${lStr}</div>
+            <div class="flex-1 text-right font-mono text-xs ${lWin?'font-bold':''}" style="${lWin?`color:${L.color}`:'color:var(--muted)'}">
+                ${fmtL ? fmtL(lv) : lv}
+            </div>
             <div class="w-24 text-center text-[8px] uppercase tracking-widest flex-shrink-0" style="color:var(--muted)">${label}</div>
-            <div class="flex-1 text-left font-mono text-xs ${rWin ? 'font-bold' : ''}" style="${rWin ? `color:${R.color}` : 'color:var(--muted)'}">${rStr}</div>
+            <div class="flex-1 text-left font-mono text-xs ${rWin?'font-bold':''}" style="${rWin?`color:${R.color}`:'color:var(--muted)'}">
+                ${fmtR ? fmtR(rv) : rv}
+            </div>
         </div>`;
     };
 
-    const dFmt   = (v)    => v > 0 ? `+$${v}M` : v < 0 ? `-$${Math.abs(v)}M` : '$0M';
-    const posFmt = (v, p) => `P${p.pos}`;
-    const valFmt = (v)    => `$${v}M`;
-
-    const gap    = Math.abs(L.points - R.points);
-    const aTied  = L.points === R.points;
-    const ahead  = L.points >= R.points ? L : R;
-
+    const posL = getPos(lk), posR = getPos(rk);
     el.innerHTML = `
     <div class="grid grid-cols-2 gap-3 mb-4">
         <div class="card p-3" style="border-left:3px solid ${L.color}">
@@ -556,25 +603,28 @@ function renderH2H() {
         </div>
     </div>
     <div class="card px-4 py-1 mb-4">
-        ${row('Position',  -L.pos,        -R.pos,        posFmt)}
-        ${row('Total Pts', L.points,      R.points,      null)}
-        ${row('Aus GP',    L.lastRace,    R.lastRace,    null)}
-        ${row('Team Val',  L.value,       R.value,       valFmt)}
-        ${row('Value Δ',   L.valueDelta,  R.valueDelta,  dFmt)}
+        ${row('Position',   -posL,            -posR,            v => `P${Math.abs(v)}`,  v => `P${Math.abs(v)}`)}
+        ${row('Total Pts',  Lpts,             Rpts)}
+        ${row('Last Race',  getLatestRace(lk),getLatestRace(rk))}
+        ${row('Team Val',   getLatestValue(lk),getLatestValue(rk), v=>`$${v}M`, v=>`$${v}M`)}
+        ${row('Rounds',     ROUNDS.filter(r=>r.standings.find(s=>s.player_key===lk&&s.points>0)).length,
+                            ROUNDS.filter(r=>r.standings.find(s=>s.player_key===rk&&s.points>0)).length)}
     </div>
     <div class="card p-4 text-center rb-border">
         <div class="text-[9px] uppercase tracking-widest mb-1" style="color:var(--subtext)">Points Gap</div>
-        <div class="fun text-4xl leading-none" style="color:${aTied ? '#f4a100' : ahead.color}">
-            ${aTied ? 'TIED' : gap + ' pts'}
+        <div class="fun text-4xl leading-none" style="color:${tied ? '#f4a100' : ahead.color}">
+            ${tied ? 'TIED' : gap + ' pts'}
         </div>
         <div class="text-[10px] mt-2" style="color:var(--subtext)">
-            ${aTied
-                ? 'Dead level — both on ' + L.points + ' pts'
-                : ahead.name + ' leads by ' + gap + ' points'}
+            ${tied ? 'Dead level — both on ' + Lpts + ' pts'
+                   : ahead.name + ' leads by ' + gap + ' points'}
         </div>
     </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// RENDER — JUICE
+// ═══════════════════════════════════════════════════════════════════
 function renderJuice() {
     document.getElementById('juice-content').innerHTML = JUICEBOARD_DATA.map(j => `
     <div class="jcard" style="border-left-color:${j.color}">
@@ -592,109 +642,127 @@ function renderJuice() {
     </div>`).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// RENDER — MARKET  (uses latest round data)
+// ═══════════════════════════════════════════════════════════════════
 function renderMarket() {
+    const latest = ROUNDS[ROUNDS.length - 1];
+    if (!latest) return;
+    document.getElementById('market-chip').textContent = `Post ${latest.key}`;
+
     const buildTable = (data) => {
         const sorted = [...data].sort((a,b) => b.delta - a.delta);
-        const rows = sorted.map(d => {
-            const dc = d.delta > 0 ? '#2ec4b6' : d.delta < 0 ? '#ff4757' : '#9090b8';
-            const pc = d.pts  > 0 ? '#2ec4b6' : d.pts  < 0 ? '#ff4757' : '#9090b8';
-            return `<tr class="border-b last:border-0" style="border-color:var(--border)">
-                <td class="p-3">
-                    <div class="font-bold text-[11px]" style="color:var(--text)">${d.name}</div>
-                    ${d.team ? `<div class="text-[9px]" style="color:var(--muted)">${d.team}</div>` : ''}
-                </td>
-                <td class="p-3 text-center font-mono text-[10px]" style="color:var(--subtext)">$${d.price}M</td>
-                <td class="p-3 text-center font-mono text-xs font-bold" style="color:${dc}">${d.delta > 0 ? '+' : ''}$${Math.abs(d.delta)}M</td>
-                <td class="p-3 text-right font-mono text-xs font-bold" style="color:${pc}">${d.pts > 0 ? '+' : ''}${d.pts}</td>
-            </tr>`;
-        }).join('');
         return `<table class="w-full">
             <thead><tr class="border-b" style="border-color:var(--border);background:var(--card2)">
                 <th class="p-3 text-left text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Name</th>
                 <th class="p-3 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Price</th>
                 <th class="p-3 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Δ Price</th>
-                <th class="p-3 text-right text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">R01 Pts</th>
+                <th class="p-3 text-right text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Pts</th>
             </tr></thead>
-            <tbody>${rows}</tbody>
+            <tbody>${sorted.map(d => {
+                const dc = d.delta > 0 ? '#2ec4b6' : d.delta < 0 ? '#ff4757' : '#9090b8';
+                const pc = d.pts  > 0 ? '#2ec4b6' : d.pts  < 0 ? '#ff4757' : '#9090b8';
+                return `<tr class="border-b last:border-0" style="border-color:var(--border)">
+                    <td class="p-3">
+                        <div class="font-bold text-[11px]" style="color:var(--text)">${d.name}</div>
+                        ${d.team ? `<div class="text-[9px]" style="color:var(--muted)">${d.team}</div>` : ''}
+                    </td>
+                    <td class="p-3 text-center font-mono text-[10px]" style="color:var(--subtext)">$${d.price}M</td>
+                    <td class="p-3 text-center font-mono text-xs font-bold" style="color:${dc}">${d.delta > 0?'+':''}$${Math.abs(d.delta)}M</td>
+                    <td class="p-3 text-right font-mono text-xs font-bold" style="color:${pc}">${d.pts > 0?'+':''}${d.pts}</td>
+                </tr>`;
+            }).join('')}</tbody>
         </table>`;
     };
-    document.getElementById('drivers-market').innerHTML     = buildTable(DRIVERS_DATA);
-    document.getElementById('constructors-market').innerHTML = buildTable(CONSTRUCTORS_DATA);
+
+    document.getElementById('drivers-market').innerHTML      = buildTable(latest.drivers      || []);
+    document.getElementById('constructors-market').innerHTML = buildTable(latest.constructors || []);
 }
 
-// ═══════════════════════════════════════════════════
-// RAWS TAB STATE
-// ═══════════════════════════════════════════════════
-let rawsMode = 'drivers';
-let rawsSort = { col: 'pts', dir: -1 };
-
-const TEAM_COLORS = {
-    'Mercedes':'#00d2be','Ferrari':'#e8002d','Red Bull':'#3671c6',
-    'McLaren':'#ff8000','Aston Martin':'#358c75','Alpine':'#0093cc',
-    'Williams':'#005aff','Haas':'#888888','Audi':'#52e252','Racing Bulls':'#6692ff',
-    'Cadillac':'#cc0000',
-};
+// ═══════════════════════════════════════════════════════════════════
+// RENDER — RAWS
+// ═══════════════════════════════════════════════════════════════════
+let rawsRound = null; // currently selected round object (or null = overall)
 
 function setRawsTab(tab) {
     rawsMode = tab;
-    rawsSort = { col: 'pts', dir: -1 };
-    document.querySelectorAll('.raws-tab-btn').forEach(b => {
-        b.style.background = '';
-        b.style.color = 'var(--muted)';
-    });
+    rawsSort = { col:'pts', dir:-1 };
+    document.querySelectorAll('.raws-tab-btn').forEach(b => { b.style.background=''; b.style.color='var(--muted)'; });
     const active = document.getElementById('raws-tab-' + tab);
     active.style.background = '#ffffff';
     active.style.color = 'var(--text)';
     renderRaws();
 }
 
-function getRawPts(item, raceKey) {
-    if (raceKey === 'overall') return item.races.reduce((s,r) => s + r.pts, 0);
-    const r = item.races.find(x => x.r === raceKey);
-    return r ? r.pts : null;
-}
-
 function renderRaws() {
-    const raceKey = document.getElementById('raws-race-select').value;
-    const isOverall = raceKey === 'overall';
-    const data = rawsMode === 'drivers' ? RAW_DRIVERS : RAW_CONSTRUCTORS;
-    const chip = document.getElementById('raws-race-chip');
-    chip.textContent = isOverall ? 'All Races' : raceKey;
+    const selVal    = document.getElementById('raws-race-select').value;
+    const isOverall = selVal === 'overall';
+    const chip      = document.getElementById('raws-race-chip');
+    chip.textContent = isOverall ? 'All Races' : (ROUNDS.find(r=>r.round===parseInt(selVal))?.key || selVal);
 
+    // Aggregate data across rounds or pick single round
+    let drivers = [], constructors = [];
+
+    if (isOverall) {
+        // Sum pts across rounds per driver/constructor
+        const dMap = {}, cMap = {};
+        ROUNDS.forEach(r => {
+            (r.drivers || []).forEach(d => {
+                if (!dMap[d.full]) dMap[d.full] = { ...d, pts:0, races:[] };
+                dMap[d.full].pts += d.pts;
+                dMap[d.full].races.push({ r: r.key, pts: d.pts });
+                dMap[d.full].price = d.price; // latest price
+                dMap[d.full].delta = d.delta;
+                dMap[d.full].sel   = d.sel;
+            });
+            (r.constructors || []).forEach(c => {
+                if (!cMap[c.name]) cMap[c.name] = { ...c, pts:0, races:[] };
+                cMap[c.name].pts += c.pts;
+                cMap[c.name].races.push({ r: r.key, pts: c.pts });
+                cMap[c.name].price = c.price;
+                cMap[c.name].delta = c.delta;
+                cMap[c.name].sel   = c.sel;
+            });
+        });
+        drivers      = Object.values(dMap);
+        constructors = Object.values(cMap);
+    } else {
+        const r = ROUNDS.find(rd => rd.round === parseInt(selVal));
+        if (!r) return;
+        drivers      = (r.drivers      || []).map(d => ({ ...d, races:[{r:r.key, pts:d.pts}] }));
+        constructors = (r.constructors || []).map(c => ({ ...c, races:[{r:r.key, pts:c.pts}] }));
+    }
+
+    const data = rawsMode === 'drivers' ? drivers : constructors;
+
+    // Enrich
     const enriched = data.map(d => ({
         ...d,
-        pts: getRawPts(d, raceKey),
-        totalPts: d.races.reduce((s,r) => s + r.pts, 0),
-        avgPts: d.races.length ? +(d.races.reduce((s,r) => s + r.pts, 0) / d.races.length).toFixed(1) : 0,
+        avgPts: d.races?.length ? +(d.pts / d.races.length).toFixed(1) : d.pts,
     }));
 
     enriched.sort((a,b) => {
-        let av = a[rawsSort.col], bv = b[rawsSort.col];
-        if (av === null) av = -9999;
-        if (bv === null) bv = -9999;
+        let av = a[rawsSort.col] ?? -9999, bv = b[rawsSort.col] ?? -9999;
         return rawsSort.dir * (bv - av);
     });
 
     const colSort = (col, label) => {
         const active = rawsSort.col === col;
         const arrow  = active ? (rawsSort.dir === -1 ? '↓' : '↑') : '↕';
-        const c      = active ? '#3a86ff' : 'var(--muted)';
         return `<th class="p-2 text-center cursor-pointer select-none text-[8px] uppercase tracking-wider font-normal whitespace-nowrap"
-                    style="color:${c}" onclick="sortRaws('${col}')">
-                    ${label} <span style="opacity:.7">${arrow}</span>
-                </th>`;
+                    style="color:${active?'#3a86ff':'var(--muted)'}" onclick="sortRaws('${col}')">
+                    ${label} <span style="opacity:.7">${arrow}</span></th>`;
     };
 
     const rows = enriched.map((d, i) => {
-        const pts     = d.pts;
-        const pc      = pts === null ? 'var(--muted)' : pts > 0 ? '#2ec4b6' : pts < 0 ? '#ff4757' : 'var(--muted)';
+        const pc      = d.pts > 0 ? '#2ec4b6' : d.pts < 0 ? '#ff4757' : 'var(--muted)';
         const dc      = d.delta > 0 ? '#2ec4b6' : d.delta < 0 ? '#ff4757' : 'var(--muted)';
         const tc      = TEAM_COLORS[rawsMode === 'drivers' ? d.team : d.name] || '#9090b8';
         const rank    = i + 1;
-        const rankCol = rank === 1 ? '#f4a100' : rank === 2 ? '#9a9aaa' : rank === 3 ? '#cd7f32' : 'var(--muted)';
-        const ptsTxt  = pts === null ? '—' : (pts > 0 ? '+' : '') + pts;
+        const rankCol = rank===1?'#f4a100':rank===2?'#9a9aaa':rank===3?'#cd7f32':'var(--muted)';
         return `
-        <tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
+        <tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)"
+            onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
             <td class="p-2 text-center font-mono text-[10px] font-bold w-7" style="color:${rankCol}">${rank}</td>
             <td class="p-2">
                 <div class="font-bold text-[11px] leading-tight" style="color:var(--text)">${d.name}</div>
@@ -703,9 +771,9 @@ function renderRaws() {
                     : `<div class="w-2 h-2 rounded-full mt-1 inline-block" style="background:${tc}"></div>`}
             </td>
             <td class="p-2 text-center font-mono text-[10px]" style="color:var(--subtext)">$${d.price}M</td>
-            <td class="p-2 text-center font-mono text-xs font-bold" style="color:${pc}">${ptsTxt}</td>
+            <td class="p-2 text-center font-mono text-xs font-bold" style="color:${pc}">${d.pts > 0?'+':''}${d.pts}</td>
             <td class="p-2 text-center font-mono text-[10px]" style="color:var(--subtext)">${d.avgPts}</td>
-            <td class="p-2 text-center font-mono text-[10px] font-bold" style="color:${dc}">${d.delta > 0 ? '+' : ''}$${Math.abs(d.delta)}M</td>
+            <td class="p-2 text-center font-mono text-[10px] font-bold" style="color:${dc}">${d.delta>0?'+':''}$${Math.abs(d.delta)}M</td>
             <td class="p-2 text-center font-mono text-[10px]" style="color:var(--muted)">${d.sel}%</td>
         </tr>`;
     }).join('');
@@ -713,47 +781,44 @@ function renderRaws() {
     document.getElementById('raws-table').innerHTML = `
     <div style="overflow-x:auto">
     <table class="w-full" style="min-width:340px">
-        <thead>
-            <tr class="border-b" style="background:var(--card2);border-color:var(--border)">
-                <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal w-7" style="color:var(--muted)">#</th>
-                <th class="p-2 text-left text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">${rawsMode === 'drivers' ? 'Driver' : 'Constructor'}</th>
-                ${colSort('price',   'Price')}
-                ${colSort('pts',     isOverall ? 'Total' : 'Pts')}
-                ${colSort('avgPts',  'Avg')}
-                ${colSort('delta',   'Δ$')}
-                ${colSort('sel',     'Sel%')}
-            </tr>
-        </thead>
+        <thead><tr class="border-b" style="background:var(--card2);border-color:var(--border)">
+            <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal w-7" style="color:var(--muted)">#</th>
+            <th class="p-2 text-left text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">${rawsMode==='drivers'?'Driver':'Constructor'}</th>
+            ${colSort('price','Price')}
+            ${colSort('pts',  isOverall?'Total':'Pts')}
+            ${colSort('avgPts','Avg')}
+            ${colSort('delta','Δ$')}
+            ${colSort('sel',  'Sel%')}
+        </tr></thead>
         <tbody>${rows}</tbody>
-    </table>
-    </div>`;
+    </table></div>`;
 
-    const top = enriched[0];
-    const bot = [...enriched].filter(d => d.pts !== null).sort((a,b) => a.pts - b.pts)[0];
+    const top      = enriched[0];
+    const bot      = [...enriched].sort((a,b) => a.pts - b.pts)[0];
     const topDelta = [...enriched].sort((a,b) => b.delta - a.delta)[0];
-    const totPts = enriched.reduce((s,d) => s + (d.pts || 0), 0);
+    const totPts   = enriched.reduce((s,d) => s + d.pts, 0);
 
     document.getElementById('raws-summary').innerHTML = `
     <div class="grid grid-cols-2 gap-2 mb-4">
         <div class="card p-3">
-            <div class="text-[8px] uppercase tracking-wide mb-1" style="color:var(--muted)">🏆 Top ${rawsMode === 'drivers' ? 'Driver' : 'Constructor'}</div>
-            <div class="fun text-sm" style="color:#2ec4b6">${top.name}</div>
-            <div class="font-mono text-xs mt-0.5" style="color:#2ec4b6">${top.pts > 0 ? '+' : ''}${top.pts} pts</div>
+            <div class="text-[8px] uppercase tracking-wide mb-1" style="color:var(--muted)">🏆 Top ${rawsMode==='drivers'?'Driver':'Constructor'}</div>
+            <div class="fun text-sm" style="color:#2ec4b6">${top?.name||'—'}</div>
+            <div class="font-mono text-xs mt-0.5" style="color:#2ec4b6">${top?.pts>0?'+':''}${top?.pts??'—'} pts</div>
         </div>
         <div class="card p-3">
             <div class="text-[8px] uppercase tracking-wide mb-1" style="color:var(--muted)">💀 Lowest</div>
-            <div class="fun text-sm" style="color:#ff4757">${bot?.name || '—'}</div>
-            <div class="font-mono text-xs mt-0.5" style="color:#ff4757">${bot ? (bot.pts > 0 ? '+' : '') + bot.pts + ' pts' : '—'}</div>
+            <div class="fun text-sm" style="color:#ff4757">${bot?.name||'—'}</div>
+            <div class="font-mono text-xs mt-0.5" style="color:#ff4757">${bot?.pts>0?'+':''}${bot?.pts??'—'} pts</div>
         </div>
         <div class="card p-3">
             <div class="text-[8px] uppercase tracking-wide mb-1" style="color:var(--muted)">📈 Best Value Δ</div>
-            <div class="fun text-sm" style="color:#f4a100">${topDelta.name}</div>
-            <div class="font-mono text-xs mt-0.5" style="color:#f4a100">+$${topDelta.delta}M</div>
+            <div class="fun text-sm" style="color:#f4a100">${topDelta?.name||'—'}</div>
+            <div class="font-mono text-xs mt-0.5" style="color:#f4a100">${topDelta?.delta>0?'+':''}$${Math.abs(topDelta?.delta||0)}M</div>
         </div>
         <div class="card p-3">
             <div class="text-[8px] uppercase tracking-wide mb-1" style="color:var(--muted)">Σ Field Pts</div>
             <div class="fun text-sm" style="color:#3a86ff">${totPts} pts</div>
-            <div class="text-[8px] mt-0.5" style="color:var(--muted)">${isOverall ? 'season' : raceKey}</div>
+            <div class="text-[8px] mt-0.5" style="color:var(--muted)">${isOverall?'season':chip.textContent}</div>
         </div>
     </div>`;
 }
@@ -764,29 +829,23 @@ function sortRaws(col) {
     renderRaws();
 }
 
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // NAVIGATION
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('page-' + page).classList.add('active');
-    document.getElementById('nav-' + page).classList.add('active');
+    document.getElementById('nav-'  + page).classList.add('active');
     window.scrollTo(0, 0);
 }
 
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // INIT
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    renderStandings();
-    renderH2H();
-    renderJuice();
-    renderMarket();
-    renderRaws();
-
-    // Auto-sync on load — reads data.json if committed by GitHub Actions
-    syncF1Data();
+    renderJuice();   // static, render immediately
+    syncData();      // loads history.json → renders everything else
 });
 </script>
 </body>

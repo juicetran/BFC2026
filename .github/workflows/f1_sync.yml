@@ -1,0 +1,31 @@
+name: Sync F1 Fantasy Data
+on:
+  schedule:
+    - cron: '0 10 * * 2' # Runs every Tuesday at 10:00 AM UTC
+  workflow_dispatch:      # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Sync Script
+        env:
+          F1_EMAIL: ${{ secrets.F1_EMAIL }}
+          F1_PASSWORD: ${{ secrets.F1_PASSWORD }}
+        run: python scripts/fetch_f1_data.py
+
+      - name: Commit and Push
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-sync F1 Fantasy data"

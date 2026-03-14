@@ -362,9 +362,10 @@ async function syncF1Teams() {
         const res = await fetch('./f1_teams.json', { cache:'no-cache' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         F1_TEAMS = await res.json();
+        if (!Object.keys(PLAYERS).length) PLAYERS = { ...PLAYER_CONFIG };
         populateTeamsDropdowns();
         renderTeamsPanel();
-        renderHomeWeekly();
+        renderHomeWeekly(); // rebuilds dropdown + standings from f1_teams
         document.getElementById('teams-error').style.display = 'none';
         refreshFantasyRoundsIfNeeded();
     } catch(e) {
@@ -408,9 +409,21 @@ function applyHistory(db) {
 
     populateRoundDropdowns();
 
-    const latest = ROUNDS[ROUNDS.length - 1];
-    document.getElementById('header-subtitle').textContent =
-        `2026 Season · ${latest.key||'R0?'} · ${latest.gp||''} ${latest.flag||''}`;
+    // Update subtitle — prefer f1_teams data for current round label
+    const teamsRounds = getTeamsRelevantRounds();
+    if (teamsRounds.length) {
+        const lr = teamsRounds[teamsRounds.length - 1];
+        const schedR = F1_SCHEDULE.find(s => s.round === lr.round);
+        const gpName = schedR ? schedR.gp : (lr.gp || `Round ${lr.round}`);
+        const flag = GP_FLAGS[gpName] || '🏁';
+        const provTag = lr.confirmed ? '' : ' · 🔄';
+        document.getElementById('header-subtitle').textContent =
+            `2026 Season · R${String(lr.round).padStart(2,'0')} · ${gpName} ${flag}${provTag}`;
+    } else {
+        const latest = ROUNDS[ROUNDS.length - 1];
+        document.getElementById('header-subtitle').textContent =
+            `2026 Season · ${latest.key||'R0?'} · ${latest.gp||''} ${latest.flag||''}`;
+    }
 
     renderStandings();
     renderH2H();
@@ -419,17 +432,45 @@ function applyHistory(db) {
 // ═══════════════════════════════════════════════════════════════════
 // ROUND DROPDOWNS
 // ═══════════════════════════════════════════════════════════════════
-function populateRoundDropdowns() {
-    // Standings
+
+// Returns rounds from f1_teams that have picks (confirmed or live-provisional)
+function getTeamsRelevantRounds() {
+    if (!F1_TEAMS) return [];
+    return (F1_TEAMS.rounds || [])
+        .filter(r => r.confirmed || r.teams?.some(t => t.picks?.length > 0))
+        .sort((a, b) => a.round - b.round);
+}
+
+function populateHomeRoundDropdown() {
     const sSelect = document.getElementById('standings-round-select');
     sSelect.innerHTML = '<option value="overall">📊 Overall</option>';
-    [...ROUNDS].reverse().forEach(r => {
-        const o = document.createElement('option');
-        o.value = r.round;
-        o.textContent = r.label || `R${String(r.round).padStart(2,'0')} · ${r.gp}`;
-        sSelect.appendChild(o);
-    });
-    if (ROUNDS.length) sSelect.value = ROUNDS[ROUNDS.length - 1].round;
+    const relevantRounds = getTeamsRelevantRounds();
+    if (relevantRounds.length) {
+        [...relevantRounds].reverse().forEach(r => {
+            const schedRound = F1_SCHEDULE.find(s => s.round === r.round);
+            const gpName = schedRound ? schedRound.gp : (r.gp || `Round ${r.round}`);
+            const flag = GP_FLAGS[gpName] || '🏁';
+            const provTag = r.confirmed ? '' : ' 🔄';
+            const o = document.createElement('option');
+            o.value = 'r' + r.round;
+            o.textContent = `${flag} R${String(r.round).padStart(2,'0')} · ${gpName}${provTag}`;
+            sSelect.appendChild(o);
+        });
+        sSelect.value = 'r' + relevantRounds[relevantRounds.length - 1].round;
+    } else {
+        // Fallback to history ROUNDS
+        [...ROUNDS].reverse().forEach(r => {
+            const o = document.createElement('option');
+            o.value = r.round;
+            o.textContent = r.label || `R${String(r.round).padStart(2,'0')} · ${r.gp}`;
+            sSelect.appendChild(o);
+        });
+        if (ROUNDS.length) sSelect.value = ROUNDS[ROUNDS.length - 1].round;
+    }
+}
+
+function populateRoundDropdowns() {
+    populateHomeRoundDropdown();
 
     // H2H players
     ['h2h-left','h2h-right'].forEach((id, i) => {
@@ -451,39 +492,9 @@ function populateRoundDropdowns() {
     if (ROUNDS.length) hSel.value = ROUNDS[ROUNDS.length - 1].round;
 }
 
-// ─── Helper: get standings array for a given round selection ───
-function getStandingsForView(roundVal) {
-    const isOverall = roundVal === 'overall';
-    if (isOverall) {
-        const totals = {};
-        Object.keys(PLAYERS).forEach(k => { totals[k] = { points:0, race_points:0, team_value:0 }; });
-        ROUNDS.forEach(r => {
-            r.standings.forEach(s => {
-                if (!totals[s.player_key]) totals[s.player_key] = { points:0, race_points:0, team_value:0 };
-                totals[s.player_key].points += s.points;
-                totals[s.player_key].race_points = s.race_points;
-                totals[s.player_key].team_value  = s.team_value;
-            });
-        });
-        return Object.entries(totals)
-            .map(([k, v]) => ({ player_key:k, points:v.points, race_points:v.race_points, team_value:v.team_value }))
-            .sort((a,b) => b.points - a.points)
-            .map((s, i, arr) => ({
-                ...s, pos:i+1, movement:0,
-                gapAbove: i > 0 ? s.points - arr[i-1].points : null,
-                gapP1:    s.points - arr[0].points,
-            }));
-    }
-    const round = ROUNDS.find(r => r.round === parseInt(roundVal));
-    if (!round) return [];
-    return round.standings.map((s, i, arr) => ({
-        ...s, pos:i+1, movement:0,
-        gapAbove: i > 0 ? s.points - arr[i-1].points : null,
-        gapP1:    s.points - arr[0].points,
-    }));
-}
-
+// ─── Helper: compute overall standings from f1_teams.json ───
 function computeOverallAtRound(maxRound) {
+    // Used by H2H — keep history-based fallback
     const totals = {};
     ROUNDS.filter(r => r.round <= maxRound).forEach(r => {
         r.standings.forEach(s => {
@@ -494,54 +505,113 @@ function computeOverallAtRound(maxRound) {
     return Object.entries(totals).map(([k,v]) => ({ player_key:k, points:v })).sort((a,b) => b.points - a.points);
 }
 
+// ─── Get standings array from f1_teams.json for a given dropdown value ───
+// roundVal is 'overall', 'r1', 'r2', etc.  (or legacy numeric from history)
+function getStandingsFromTeams(roundVal) {
+    if (!Object.keys(PLAYERS).length) PLAYERS = { ...PLAYER_CONFIG };
+
+    if (roundVal === 'overall') {
+        // Use cur_points from F1_TEAMS.players
+        const arr = (F1_TEAMS?.players || []).map(pl => {
+            const key = PLAYER_ID_MAP[pl.id] || pl.id;
+            return { player_key: key, points: pl.cur_points || 0, team_value: 0 };
+        }).sort((a,b) => b.points - a.points);
+        return arr.map((s,i,a) => ({
+            ...s, pos:i+1,
+            gapAbove: i>0 ? s.points - a[i-1].points : null,
+            gapP1:    s.points - a[0].points,
+        }));
+    }
+
+    // Round view: parse 'r1' → 1
+    const roundNum = parseInt(String(roundVal).replace(/^r/i,''));
+    const roundData = (F1_TEAMS?.rounds || []).find(r => r.round === roundNum);
+    if (!roundData) return [];
+
+    const arr = (roundData.teams || [])
+        .filter(t => t.picks?.length > 0)
+        .map(t => {
+            const key = PLAYER_ID_MAP[t.player_id] || t.player_id;
+            const playerMeta = (F1_TEAMS.players||[]).find(p => p.id === t.player_id);
+            const pts = t.total_points ?? playerMeta?.cur_points ?? 0;
+            return { player_key: key, points: pts, team_value: t.team_value || 0, _teamData: t };
+        }).sort((a,b) => b.points - a.points);
+    return arr.map((s,i,a) => ({
+        ...s, pos:i+1,
+        gapAbove: i>0 ? s.points - a[i-1].points : null,
+        gapP1:    s.points - a[0].points,
+    }));
+}
+
 // ═══════════════════════════════════════════════════════════════════
-// RENDER — HOME STANDINGS (expandable team cards)
+// RENDER — HOME STANDINGS + WEEKLY (unified — driven by single dropdown)
 // ═══════════════════════════════════════════════════════════════════
 function renderStandings() {
+    if (!Object.keys(PLAYERS).length) PLAYERS = { ...PLAYER_CONFIG };
     const roundVal  = document.getElementById('standings-round-select').value;
     const isOverall = roundVal === 'overall';
-    const standings = getStandingsForView(roundVal);
+
+    // Determine if this is a round view from f1_teams or legacy history
+    const useTeams = F1_TEAMS && (isOverall || String(roundVal).startsWith('r'));
+    let standings = [];
+
+    if (useTeams) {
+        standings = getStandingsFromTeams(roundVal);
+    } else {
+        // Legacy fallback from history.json ROUNDS
+        const rNum = parseInt(roundVal);
+        const round = ROUNDS.find(r => r.round === rNum);
+        if (!round) return;
+        standings = round.standings.map((s,i,a) => ({
+            ...s, pos:i+1,
+            gapAbove: i>0 ? s.points - a[i-1].points : null,
+            gapP1:    s.points - a[0].points,
+        }));
+    }
     if (!standings.length) return;
 
-    // For each player, get their picks for this round from f1_teams.json
-    const getTeamPicks = (playerKey, roundNum) => {
-        if (!F1_TEAMS || isOverall) return null;
-        const playerId = Object.entries(PLAYER_ID_MAP).find(([,v]) => v === playerKey)?.[0];
-        if (!playerId) return null;
-        const roundData = F1_TEAMS.rounds?.find(r => r.round === parseInt(roundNum));
-        if (!roundData) return null;
-        return roundData.teams?.find(t => t.player_id === playerId) || null;
-    };
+    // Determine round number for picks lookup
+    const roundNum = isOverall ? null : parseInt(String(roundVal).replace(/^r/i,''));
+    const roundData = roundNum ? (F1_TEAMS?.rounds||[]).find(r => r.round === roundNum) : null;
+    const isProvisional = roundData ? !roundData.confirmed : false;
+
+    // Get GP name for weekly section title
+    const schedRound = roundNum ? F1_SCHEDULE.find(s => s.round === roundNum) : null;
+    const gpName = schedRound ? schedRound.gp : (roundData?.gp || (roundNum ? `Round ${roundNum}` : ''));
+    const roundFlag = gpName ? (GP_FLAGS[gpName] || '🏁') : '';
 
     const el = document.getElementById('standings-table');
     el.innerHTML = standings.map((s, i) => {
-        const p = PLAYERS[s.player_key] || {};
+        const p  = PLAYERS[s.player_key] || {};
         const mc = i < 3 ? MEDAL_COLOR[i] : (p.color || '#aaa');
-        const ptsLabel = isOverall ? `${s.points}` : `${s.race_points ?? s.points}`;
-        const teamData = getTeamPicks(s.player_key, roundVal);
+        const pts = s.points ?? 0;
+
+        // Get picks for this player in this round
+        const playerId = Object.entries(PLAYER_ID_MAP).find(([,v]) => v === s.player_key)?.[0];
+        const teamData = (!isOverall && roundData && playerId)
+            ? roundData.teams?.find(t => t.player_id === playerId) : null;
         const hasPicks = teamData?.picks?.length > 0;
 
-        // Build picks mini-display
         let picksHtml = '';
         if (hasPicks) {
-            const drivers = teamData.picks.filter(pk => pk.type === 'driver');
-            const constrs = teamData.picks.filter(pk => pk.type === 'constructor');
+            const driverPicks = teamData.picks.filter(pk => pk.type === 'driver');
+            const constrPicks = teamData.picks.filter(pk => pk.type === 'constructor');
             const pickRow = (items) => items.map(pk => {
                 const tc = TEAM_TAG_COLORS[pk.team_tag] || '#9090b8';
-                const star = pk.is_star ? '⭐' : '';
-                return `<span style="background:${tc}22;color:${tc};font-size:8px;font-weight:bold;padding:1px 5px;border-radius:5px;margin:1px;display:inline-block;">${star}${pk.short_name}</span>`;
+                return `<span style="background:${tc}22;color:${tc};font-size:8px;font-weight:bold;padding:1px 5px;border-radius:5px;margin:1px;display:inline-block;">${pk.is_star?'⭐':''}${pk.short_name}</span>`;
             }).join('');
             picksHtml = `
             <div class="team-card-detail">
                 <div class="text-[8px] uppercase tracking-widest mb-1.5" style="color:var(--muted)">Drivers</div>
-                <div class="mb-2">${pickRow(drivers)}</div>
+                <div class="mb-2">${pickRow(driverPicks)}</div>
                 <div class="text-[8px] uppercase tracking-widest mb-1.5" style="color:var(--muted)">Constructors</div>
-                <div class="mb-1">${pickRow(constrs)}</div>
+                <div class="mb-1">${pickRow(constrPicks)}</div>
                 ${teamData.team_value ? `<div class="text-[8px] mt-2" style="color:var(--muted)">Team value: <span style="color:var(--subtext)">$${teamData.team_value}M</span></div>` : ''}
             </div>`;
         }
 
         const clickable = hasPicks ? `onclick="toggleTeamCard(this)" style="cursor:pointer;"` : '';
+        const ptsColor = isProvisional ? '#f4a100' : mc;
 
         return `
         <div class="team-card prow" style="animation-delay:${i*0.05}s">
@@ -552,15 +622,15 @@ function renderStandings() {
                         : `<span class="fun text-base" style="color:${p.color}">${s.pos}</span>`}
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="fun text-[15px] leading-tight truncate" style="color:${p.color || '#aaa'}">${p.emoji||''} ${p.name || s.player_key}</div>
-                    <div class="text-[9px] truncate" style="color:var(--subtext)">${p.owner || ''}</div>
+                    <div class="fun text-[15px] leading-tight truncate" style="color:${p.color||'#aaa'}">${p.emoji||''} ${p.name||s.player_key}</div>
+                    <div class="text-[9px] truncate" style="color:var(--subtext)">${p.owner||''}</div>
                 </div>
                 <div class="text-right flex-shrink-0">
-                    <div class="fun text-base leading-none" style="color:${mc}">${ptsLabel}</div>
+                    <div class="fun text-base leading-none" style="color:${ptsColor}">${pts}${isProvisional?'<span style="font-size:8px;margin-left:2px;opacity:.7">~</span>':''}</div>
                     ${i === 0
                         ? `<div class="text-[9px] font-bold mt-0.5" style="color:var(--gold)">LEADER</div>`
                         : `<div class="text-[9px] mt-0.5 font-mono">
-                               <span style="color:#ff6b35">${s.gapAbove ?? ''}</span>
+                               <span style="color:#ff6b35">${s.gapAbove??''}</span>
                                <span style="color:#d0cee8"> | </span>
                                <span style="color:#ff4757">${s.gapP1}</span>
                            </div>`}
@@ -572,34 +642,34 @@ function renderStandings() {
     }).join('');
 
     // Quick stats
-    const latest = ROUNDS[ROUNDS.length - 1];
     const topS   = standings[0];
-    const topP   = PLAYERS[topS.player_key] || {};
-    const allPts = standings.slice().sort((a,b) => (b.race_points??b.points) - (a.race_points??a.points));
-    const bestS  = allPts[0];
+    const topP   = PLAYERS[topS?.player_key] || {};
+    const sorted = standings.slice().sort((a,b) => b.points - a.points);
+    const bestS  = sorted[0], worstS = sorted[sorted.length-1];
     const bestP  = PLAYERS[bestS?.player_key] || {};
-    const worstS = allPts[allPts.length-1];
     const worstP = PLAYERS[worstS?.player_key] || {};
-
     document.getElementById('home-stats').innerHTML = `
         <div class="card p-3 text-center">
             <div class="text-xl">🏆</div>
             <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Leader</div>
             <div class="fun text-sm mt-0.5" style="color:var(--gold)">${topP.name||'—'}</div>
-            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${topS.points} pts</div>
+            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${topS?.points??'—'} pts</div>
         </div>
         <div class="card p-3 text-center">
             <div class="text-xl">🔥</div>
             <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Best ${isOverall?'Total':'Race'}</div>
             <div class="fun text-sm mt-0.5" style="color:#ff4757">${bestP.name||'—'}</div>
-            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${bestS?.race_points??bestS?.points??'—'} pts</div>
+            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${bestS?.points??'—'} pts</div>
         </div>
         <div class="card p-3 text-center">
             <div class="text-xl">💀</div>
             <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Worst ${isOverall?'Total':'Race'}</div>
             <div class="fun text-sm mt-0.5" style="color:#c77dff">${worstP.name||'—'}</div>
-            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${worstS?.race_points??worstS?.points??'—'} pts</div>
+            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${worstS?.points??'—'} pts</div>
         </div>`;
+
+    // Update weekly section to match the selected round
+    renderHomeWeeklyForRound(roundNum, roundData, gpName, roundFlag, isProvisional);
 }
 
 function toggleTeamCard(header) {
@@ -608,59 +678,53 @@ function toggleTeamCard(header) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// RENDER — HOME WEEKLY (latest round team points from f1_teams.json)
+// RENDER — HOME WEEKLY — driven by renderStandings dropdown
 // ═══════════════════════════════════════════════════════════════════
 function renderHomeWeekly() {
-    if (!F1_TEAMS) return;
-    // Ensure PLAYERS is initialized even if history hasn't loaded yet
-    if (!Object.keys(PLAYERS).length) PLAYERS = { ...PLAYER_CONFIG };
-    const confirmedRounds = (F1_TEAMS.rounds || []).filter(r => r.confirmed && r.teams?.length > 0);
-    const provisionalRounds = (F1_TEAMS.rounds || []).filter(r => !r.confirmed && r.teams?.some(t => t.picks?.length > 0));
-    const allRelevantRounds = [...confirmedRounds, ...provisionalRounds].sort((a,b)=>a.round-b.round);
-    if (!allRelevantRounds.length) return;
+    // Called after f1_teams loads — just trigger a full re-render
+    populateHomeRoundDropdown();
+    renderStandings();
+}
 
-    const latest = allRelevantRounds[allRelevantRounds.length - 1];
-    const isProvisional = !latest.confirmed;
+function renderHomeWeeklyForRound(roundNum, roundData, gpName, roundFlag, isProvisional) {
     const section = document.getElementById('home-weekly-section');
     const title   = document.getElementById('home-weekly-title');
     const table   = document.getElementById('home-weekly-table');
 
-    // Map round number to GP name from schedule
-    const schedRound = F1_SCHEDULE.find(r => r.round === latest.round);
-    const gpName = schedRound ? schedRound.gp : (latest.gp || `Round ${latest.round}`);
-    const roundFlag = GP_FLAGS[gpName] || '🏁';
-    const provLabel = isProvisional ? ' <span style="font-size:9px;background:rgba(244,161,0,.15);color:#f4a100;padding:1px 5px;border-radius:4px;vertical-align:middle;">PROVISIONAL</span>' : '';
-
-    section.style.display = '';
-    title.innerHTML = `${roundFlag} ${gpName} — Team Points${provLabel}`;
-
-    // For confirmed rounds, show ALL teams (including those with null per-round pts)
-    // Use overall cur_points as fallback display value
-    const allTeams = [...latest.teams].filter(t => t.picks?.length > 0);
-    const teamsWithPts = allTeams.map(t => {
-        // Find cur_points from F1_TEAMS.players as fallback
-        const playerMeta = (F1_TEAMS.players||[]).find(p => p.id === t.player_id);
-        return { ...t, _displayPts: t.total_points ?? playerMeta?.cur_points ?? null };
-    }).sort((a,b) => (b._displayPts??-999) - (a._displayPts??-999));
-
-    if (!teamsWithPts.length) {
-        if (isProvisional) {
-            table.innerHTML = '<div class="p-4 text-center text-[10px]" style="color:var(--muted)">Provisional picks loaded — points not yet available.</div>';
-        } else {
-            table.innerHTML = '<div class="p-4 text-center text-[10px]" style="color:var(--muted)">Points not yet confirmed for this round.</div>';
-        }
+    if (!roundNum || !roundData) {
+        // Overall view — hide the weekly picks table
+        section.style.display = 'none';
         return;
     }
 
-    const provBannerHtml = isProvisional ? `<div style="background:rgba(244,161,0,.08);border-bottom:1px solid rgba(244,161,0,.2);padding:7px 14px;font-size:9px;color:#f4a100;">⚠️ Provisional data — points not confirmed yet</div>` : '';
+    const provLabel = isProvisional
+        ? ' <span style="font-size:9px;background:rgba(244,161,0,.15);color:#f4a100;padding:1px 5px;border-radius:4px;vertical-align:middle;">PROVISIONAL</span>'
+        : '';
+    section.style.display = '';
+    title.innerHTML = `${roundFlag} ${gpName} — Team Points${provLabel}`;
+
+    const allTeams = (roundData.teams || []).filter(t => t.picks?.length > 0);
+    const teamsWithPts = allTeams.map(t => {
+        const playerMeta = (F1_TEAMS.players||[]).find(p => p.id === t.player_id);
+        return { ...t, _displayPts: t.total_points ?? playerMeta?.cur_points ?? null };
+    }).sort((a,b) => (b._displayPts??-9999) - (a._displayPts??-9999));
+
+    if (!teamsWithPts.length) {
+        table.innerHTML = `<div class="p-4 text-center text-[10px]" style="color:var(--muted)">${isProvisional ? 'Provisional picks loaded — points incoming.' : 'No picks data for this round.'}</div>`;
+        return;
+    }
+
+    const provBannerHtml = isProvisional
+        ? `<div style="background:rgba(244,161,0,.08);border-bottom:1px solid rgba(244,161,0,.2);padding:7px 14px;font-size:9px;color:#f4a100;">⚠️ Live race week — points are provisional and updating</div>`
+        : '';
 
     table.innerHTML = provBannerHtml + teamsWithPts.map((t, i) => {
         const pid = PLAYER_ID_MAP[t.player_id] || t.player_id;
         const p   = PLAYERS[pid] || { name: t.player_id, color:'#aaa', emoji:'👤' };
         const mc  = i < 3 ? MEDAL_COLOR[i] : (p.color || '#aaa');
         const pts = t._displayPts ?? '—';
+        const ptsColor = isProvisional ? '#f4a100' : mc;
 
-        // Get drivers for this team
         const drivers = (t.picks||[]).filter(pk => pk.type==='driver').map(pk => {
             const tc = TEAM_TAG_COLORS[pk.team_tag] || '#9090b8';
             return `<span style="background:${tc}22;color:${tc};font-size:8px;font-weight:bold;padding:1px 5px;border-radius:4px;">${pk.is_star?'⭐':''}${pk.short_name}</span>`;
@@ -679,7 +743,7 @@ function renderHomeWeekly() {
                 <div class="flex-1 min-w-0">
                     <div class="fun text-[14px] leading-tight" style="color:${p.color}">${p.emoji} ${p.name}</div>
                 </div>
-                <div class="fun text-lg" style="color:${mc}">${pts}</div>
+                <div class="fun text-lg" style="color:${ptsColor}">${pts}${isProvisional&&pts!=='—'?'<span style="font-size:9px;opacity:.6">~</span>':''}</div>
             </div>
             <div class="ml-9 flex flex-wrap gap-0.5">
                 ${drivers} ${constrs}

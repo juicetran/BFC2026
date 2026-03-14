@@ -55,11 +55,18 @@ PLAYER_MAP = {
 # ─────────────────────────────────────────────────────────────────
 async def authenticate_with_browser() -> str:
     """
-    Uses a real Chromium browser (via Playwright) to POST to the F1 auth
-    endpoint, bypassing Distil Networks bot-detection that blocks plain
-    HTTP requests from datacenter IPs.
+    Uses Playwright's APIRequestContext (context.request.post) to authenticate.
 
-    Returns a subscriptionToken (Bearer token) for subsequent API calls.
+    WHY NOT page.evaluate() fetch:
+      fetch() inside a browser page is subject to CORS. api.formula1.com does
+      not allow cross-origin requests from account.formula1.com in a headless
+      context, so it throws a network error → status=0.
+
+    WHY context.request.post WORKS:
+      Playwright's APIRequestContext makes requests at the network level through
+      the real Chromium process — same TLS fingerprint, IP, and browser headers
+      as a real user — but it is NOT subject to browser CORS restrictions.
+      This bypasses Distil Networks bot-detection on datacenter IPs.
     """
     print("  Launching browser for auth …")
     async with async_playwright() as pw:
@@ -72,52 +79,49 @@ async def authenticate_with_browser() -> str:
             ),
             locale="en-US",
             timezone_id="Australia/Sydney",
+            extra_http_headers={"accept-language": "en-US,en;q=0.9"},
         )
+
+        # Visit F1 account page first to establish cookies + pass JS challenge
+        print("  Visiting F1 account page …")
         page = await context.new_page()
+        try:
+            await page.goto(
+                "https://account.formula1.com/",
+                wait_until="domcontentloaded",
+                timeout=30_000,
+            )
+            await page.wait_for_timeout(2000)
+        except Exception as e:
+            print(f"  ⚠️  Page visit warning (continuing): {e}")
 
-        # Navigate to account.formula1.com first to acquire cookies/session
-        print("  Visiting F1 account page to establish session …")
-        await page.goto("https://account.formula1.com/", wait_until="domcontentloaded", timeout=30_000)
-        await page.wait_for_timeout(1500)
-
-        # POST auth via JavaScript fetch — runs inside the real browser context
-        # so it carries the correct cookies, headers, and JS fingerprint
-        print("  Authenticating via browser fetch …")
-        result = await page.evaluate(
-            """async ([email, password]) => {
-                try {
-                    const resp = await fetch(
-                        'https://api.formula1.com/v2/account/subscriber/authenticate/by-password',
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type':  'application/json',
-                                'apikey':        'fCUCjWrKPu9ylJwRAv8BpGLEgiAuThx7',
-                                'origin':        'https://account.formula1.com',
-                                'referer':       'https://account.formula1.com/',
-                            },
-                            body: JSON.stringify({
-                                Login:               email,
-                                Password:            password,
-                                DistributionChannel: 'd861e38f-05ea-4063-8776-a7e2b6d885a4',
-                            }),
-                        }
-                    );
-                    const text = await resp.text();
-                    return { status: resp.status, body: text };
-                } catch (e) {
-                    return { status: 0, error: e.toString() };
-                }
-            }""",
-            [EMAIL, PASSWORD],
+        # Use APIRequestContext — network-level POST, not subject to CORS
+        print("  Posting auth via APIRequestContext …")
+        response = await context.request.post(
+            "https://api.formula1.com/v2/account/subscriber/authenticate/by-password",
+            headers={
+                "Content-Type":   "application/json",
+                "apikey":         "fCUCjWrKPu9ylJwRAv8BpGLEgiAuThx7",
+                "origin":         "https://account.formula1.com",
+                "referer":        "https://account.formula1.com/",
+                "authority":      "api.formula1.com",
+                "sec-fetch-site": "same-site",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-dest": "empty",
+            },
+            data=json.dumps({
+                "Login":               EMAIL,
+                "Password":            PASSWORD,
+                "DistributionChannel": "d861e38f-05ea-4063-8776-a7e2b6d885a4",
+            }),
         )
 
+        status = response.status
+        body   = await response.text()
         await browser.close()
 
-    status = result.get("status")
-    body   = result.get("body", "")
-
     print(f"  Auth response status: {status}")
+    print(f"  Auth response preview: {body[:200]}")
 
     if status != 200:
         raise RuntimeError(f"Auth failed {status}: {body[:500]}")
@@ -133,9 +137,9 @@ async def authenticate_with_browser() -> str:
         or data.get("token")
     )
     if not token:
-        raise RuntimeError(f"No token in auth response: {data}")
+        raise RuntimeError(f"No token found in response: {data}")
 
-    print("  ✅ Authenticated via browser.")
+    print("  ✅ Authenticated.")
     return token
 
 

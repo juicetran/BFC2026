@@ -1,12 +1,12 @@
 {
-    "last_updated": "2026-03-14 11:09:43",
+    "last_updated": "2026-03-14 11:16:55",
     "source_url": "https://f1fantasytools.com/budget-builder",
     "view": "required_points",
     "drivers": [
         {
             "name": "VER",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -28,7 +28,7 @@
         {
             "name": "ANT",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -50,7 +50,7 @@
         {
             "name": "LEC",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -72,7 +72,7 @@
         {
             "name": "RUS",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -94,7 +94,7 @@
         {
             "name": "HAM",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -116,7 +116,7 @@
         {
             "name": "NOR",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -138,7 +138,7 @@
         {
             "name": "PIA",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -160,7 +160,7 @@
         {
             "name": "BEA",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -182,7 +182,7 @@
         {
             "name": "LIN",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -204,7 +204,7 @@
         {
             "name": "BOR",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -226,7 +226,7 @@
         {
             "name": "COL",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -248,7 +248,7 @@
         {
             "name": "PER",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -270,7 +270,7 @@
         {
             "name": "OCO",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -292,7 +292,7 @@
         {
             "name": "LAW",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -314,7 +314,7 @@
         {
             "name": "GAS",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -336,7 +336,7 @@
         {
             "name": "SAI",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -358,7 +358,7 @@
         {
             "name": "ALB",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -380,7 +380,7 @@
         {
             "name": "BOT",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -402,7 +402,7 @@
         {
             "name": "HUL",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -424,7 +424,7 @@
         {
             "name": "ALO",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -446,7 +446,7 @@
         {
             "name": "STR",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -468,7 +468,7 @@
         {
             "name": "HAD",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -492,7 +492,7 @@
         {
             "name": "MER",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -514,7 +514,7 @@
         {
             "name": "FER",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -536,7 +536,7 @@
         {
             "name": "RED",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -558,7 +558,7 @@
         {
             "name": "MCL",
             "tier": "A",
-            "tier_label": "Tier A (>=18.5M)",
+            "tier_label": "Tier A(>=18.5M)",
             "price_changes": [
                 "-0.3",
                 "-0.1",
@@ -580,7 +580,7 @@
         {
             "name": "VRB",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -602,7 +602,7 @@
         {
             "name": "HAA",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -624,7 +624,7 @@
         {
             "name": "ALP",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -646,7 +646,7 @@
         {
             "name": "WIL",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -668,7 +668,7 @@
         {
             "name": "AUD",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -690,7 +690,7 @@
         {
             "name": "CAD",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",
@@ -712,7 +712,7 @@
         {
             "name": "AST",
             "tier": "B",
-            "tier_label": "Tier B (<18.5M)",
+            "tier_label": "Tier B(<18.5M)",
             "price_changes": [
                 "-0.6",
                 "-0.2",

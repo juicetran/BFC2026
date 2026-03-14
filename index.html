@@ -188,7 +188,7 @@
                     style="background:#ffffff;color:var(--text)">Drivers</button>
                 <button id="data-tab-constructors" onclick="setDataTab('constructors')"
                     class="data-tab-btn px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all"
-                    style="color:var(--muted)">Teams</button>
+                    style="color:var(--muted)">Constructors</button>
             </div>
 
             <p class="text-[8px] mb-2 px-1 uppercase tracking-widest" style="color:var(--muted)">Tap column header to sort ↕</p>
@@ -209,7 +209,7 @@
                 <div style="font-size:24px;margin-bottom:6px;">⚠️</div>
                 <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Data not available</div>
                 <div class="text-[9px]" style="color:var(--subtext)">
-                    Run the scraper to generate <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_data.json</code>, then push to GitHub.
+                    Run the scraper to generate <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_budget_data.json</code>, then push to GitHub.
                 </div>
             </div>
         </div>
@@ -719,12 +719,12 @@ function sortDataCol(col) {
 
 async function loadF1Data() {
     try {
-        const res = await fetch('./f1_data.json', { cache:'no-cache' });
+        const res = await fetch('./f1_budget_data.json', { cache:'no-cache' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         F1_DATA = await res.json();
         renderBudgetTable();
     } catch (e) {
-        console.warn('f1_data.json not found:', e);
+        console.warn('f1_budget_data.json not found:', e);
         document.getElementById('data-budget-table').style.display = 'none';
         document.getElementById('data-budget-error').style.display = '';
         document.getElementById('data-freshness-chip').textContent = 'No data';
@@ -766,10 +766,12 @@ function renderBudgetTable() {
         return arr;
     }
 
-    // ── Format odds: "87% (<=28)" -> bold coloured % + muted pts threshold ──
+    // ── Format odds: handles "87% (<=28)" format OR bare numbers/percentages ──
     const fmtOdds = (val) => {
         if (!val && val !== 0) return '<span style="color:var(--muted)">—</span>';
         const s = String(val).trim();
+        if (!s || s === '-' || s === '—') return '<span style="color:var(--muted)">—</span>';
+        // Full format: "87% (<=28)"
         const m = s.match(/^(\d+)%\s*\(([^)]+)\)/);
         if (m) {
             const pct = parseInt(m[1]);
@@ -780,7 +782,20 @@ function renderBudgetTable() {
                  + '<div style="color:var(--muted);font-size:8px">' + m[2] + '</div>'
                  + '</div>';
         }
-        if (s === '0%' || s === '0') return '<span style="color:var(--muted);font-size:10px">0%</span>';
+        // Bare percentage: "87%"
+        const mp = s.match(/^(\d+)%$/);
+        if (mp) {
+            const pct = parseInt(mp[1]);
+            const col = pct >= 70 ? '#2ec4b6' : pct >= 30 ? '#f4a100' : 'var(--subtext)';
+            const fw  = pct >= 70 ? 'bold' : 'normal';
+            return '<span style="color:' + col + ';font-weight:' + fw + ';font-size:10px">' + pct + '%</span>';
+        }
+        // Bare number (xPts/points value)
+        const n = parseFloat(s);
+        if (!isNaN(n)) {
+            const col = n > 0 ? '#2ec4b6' : n < 0 ? '#ff4757' : 'var(--subtext)';
+            return '<span style="color:' + col + ';font-size:10px">' + s + '</span>';
+        }
         return '<span style="color:var(--subtext);font-size:10px">' + s + '</span>';
     };
 
@@ -833,7 +848,7 @@ function renderBudgetTable() {
     const sc = (col, lbl) => '<th class="p-2 text-center text-[8px] font-normal cursor-pointer select-none whitespace-nowrap"'
         + ' style="color:' + ac(col) + '" onclick="sortDataCol(\'' + col + '\')">' + lbl + '</th>';
 
-    const nameLabel = dataMode === 'drivers' ? 'Driver' : 'Team';
+    const nameLabel = dataMode === 'drivers' ? 'Driver' : 'Constructor';
 
     const groupHead = '<thead>'
         + '<tr style="background:var(--card2);border-bottom:1px solid var(--border)">'

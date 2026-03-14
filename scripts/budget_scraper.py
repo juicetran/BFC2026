@@ -40,6 +40,18 @@ async def scrape_table(table, table_index: int) -> list[dict]:
     """
     Scrape one <table> element.
     Returns list of entry dicts, each with a 'tier' key ('A' or 'B').
+
+    Actual Budget Builder column layout (10 cells per data row):
+      0  : Tag          e.g. "RUS"
+      1  : Price        e.g. "27.7"
+      2  : Pts          season rolling total (may be "-" mid-week)
+      3  : Pts R1       points from most recent completed race
+      4  : xPts         expected points
+      5  : -0.3 Odds    e.g. "10% (≤-6)"
+      6  : -0.1 Odds    e.g. "1% (-5)"
+      7  : +0.1 Odds    e.g. "2% (11)"
+      8  : +0.3 Odds    e.g. "87% (28)"
+      9  : R2 xΔ$       e.g. "+0.23"
     """
     entries = []
     current_tier       = None
@@ -165,9 +177,9 @@ async def run_scraper():
         finally:
             await browser.close()
 
-        with open("f1_data.json", "w", encoding="utf-8") as f:
+        with open("f1_budget_data.json", "w", encoding="utf-8") as f:
             json.dump(data_output, f, indent=4, ensure_ascii=False)
-        print("✅  f1_data.json written.")
+        print("✅  f1_budget_data.json written.")
 
 
 if __name__ == "__main__":

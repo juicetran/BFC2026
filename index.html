@@ -44,6 +44,11 @@
         #sync-banner.error{background:#ff475722;color:#ff4757;border-bottom:1px solid #ff475744;}
         .skeleton{background:linear-gradient(90deg,#e8e6f5 25%,#f5f4fa 50%,#e8e6f5 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;}
         @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        /* Team card expand */
+        .team-card-detail{display:none;border-top:1px solid var(--border);padding:10px 14px;}
+        .team-card.open .team-card-detail{display:block;}
+        .team-card.open .team-card-chevron{transform:rotate(180deg);}
+        .team-card-chevron{transition:transform .2s;font-size:10px;color:var(--muted);}
     </style>
 </head>
 <body>
@@ -59,7 +64,7 @@
                 <p class="text-[9px] text-[#9090b8] uppercase tracking-widest mt-0.5" id="header-subtitle">2026 Season · Loading…</p>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="syncData()" id="sync-btn" title="Sync from history.json"
+                <button onclick="syncAll()" id="sync-btn"
                     style="background:#f5f4fa;border:1px solid #e2e0ee;border-radius:10px;padding:6px 10px;cursor:pointer;font-size:10px;color:#6b6b8a;font-family:'Share Tech Mono',monospace;transition:all .15s;"
                     onmouseover="this.style.background='#e8e6f5'" onmouseout="this.style.background='#f5f4fa'">
                     🔄 Sync
@@ -71,7 +76,7 @@
 
     <!-- HOME PAGE -->
     <div id="page-home" class="page active px-4 pt-5">
-        <!-- Standings header + round dropdown -->
+        <!-- Overall Standings -->
         <div class="flex items-center justify-between mb-3">
             <h2 class="fun text-xl" style="color:var(--text)">Standings</h2>
             <div style="position:relative;width:190px;">
@@ -82,23 +87,26 @@
             </div>
         </div>
 
-        <div class="flex gap-3 text-[9px] mb-2 px-1">
-            <span style="color:#ff6b35">▲ gap to above</span>
-            <span style="color:#d0cee8">|</span>
-            <span style="color:#ff4757">◆ gap to P1</span>
-        </div>
+        <!-- Standings table — expandable team cards -->
         <div class="card overflow-hidden mb-4" id="standings-table">
-            <!-- skeleton -->
             <div class="skeleton" style="height:56px;border-radius:0;margin-bottom:1px;opacity:.5"></div>
             <div class="skeleton" style="height:56px;border-radius:0;margin-bottom:1px;opacity:.4"></div>
             <div class="skeleton" style="height:56px;border-radius:0;opacity:.3"></div>
         </div>
 
-        <!-- Quick stats — dynamic -->
+        <!-- Quick stats -->
         <div class="grid grid-cols-3 gap-2 mb-4" id="home-stats">
             <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
             <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
             <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
+        </div>
+
+        <!-- Latest round team standings (weekly) -->
+        <div id="home-weekly-section" style="display:none">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="fun text-base" style="color:var(--text)" id="home-weekly-title">Latest Round</h3>
+            </div>
+            <div class="card overflow-hidden mb-4" id="home-weekly-table"></div>
         </div>
 
         <div class="card p-4" id="home-recap">
@@ -115,14 +123,22 @@
 
     <!-- H2H PAGE -->
     <div id="page-h2h" class="page px-4 pt-5">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between mb-3">
             <h2 class="fun text-xl" style="color:var(--text)">H2H Pulse ⚡</h2>
             <span class="chip" id="h2h-chip" style="background:rgba(58,134,255,.12);color:#3a86ff">—</span>
         </div>
-        <div class="grid grid-cols-[1fr_20px_1fr] items-center gap-2 mb-4">
+        <!-- Player selectors -->
+        <div class="grid grid-cols-[1fr_20px_1fr] items-center gap-2 mb-3">
             <select id="h2h-left"  onchange="renderH2H()"></select>
             <div class="text-center text-xs" style="color:var(--muted)">vs</div>
             <select id="h2h-right" onchange="renderH2H()"></select>
+        </div>
+        <!-- Round toggle -->
+        <div style="position:relative;margin-bottom:16px;">
+            <select id="h2h-round-select" onchange="renderH2H()" style="padding:9px 28px 9px 10px;">
+                <option value="overall">📊 Overall Season</option>
+            </select>
+            <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
         </div>
         <div id="h2h-content"></div>
     </div>
@@ -133,141 +149,106 @@
             <h2 class="fun text-xl" style="color:var(--text)">Schedule 📅</h2>
             <span class="chip" style="background:rgba(58,134,255,.12);color:#3a86ff">2026 Season</span>
         </div>
-        <!-- Countdown card -->
         <div class="card p-4 mb-4" id="sched-countdown-card">
             <div class="text-[8px] uppercase tracking-widest mb-1" style="color:var(--muted)">Next Session · Sydney Time</div>
             <div class="fun text-base mb-0.5" style="color:var(--text)" id="sched-countdown-event">Loading…</div>
             <div class="font-mono text-2xl font-bold rb-text" id="sched-countdown-timer">--:--:--</div>
             <div class="text-[9px] mt-1" style="color:var(--subtext)" id="sched-countdown-when"></div>
         </div>
-        <!-- Round selector -->
         <div style="position:relative;margin-bottom:12px;">
             <select id="sched-round-select" onchange="renderScheduleRound()" style="padding:9px 28px 9px 10px;"></select>
             <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
         </div>
-        <!-- Session table -->
         <div class="card overflow-hidden" id="sched-session-table"></div>
     </div>
 
     <!-- DATA PAGE -->
     <div id="page-data" class="page px-4 pt-5">
-        <!-- Header row -->
         <div class="flex items-center justify-between mb-3">
             <h2 class="fun text-xl" style="color:var(--text)">Data 📊</h2>
             <span class="chip" style="background:rgba(46,196,182,.12);color:#2ec4b6" id="data-freshness-chip">—</span>
         </div>
-
-        <!-- Stat-type selector -->
         <div style="position:relative;margin-bottom:12px;">
             <select id="data-stat-select" onchange="onDataStatChange()" style="padding:9px 28px 9px 10px;">
                 <option value="budget">📉 Budget Stats</option>
-                <option value="fantasy">🏆 Fantasy Data</option>
+                <option value="fantasy">🏆 Fantasy Prices & Points</option>
                 <option value="teams">👥 League Teams</option>
-                <option value="live" disabled>⚡ Live Scoring (coming soon)</option>
             </select>
             <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
         </div>
 
         <!-- Budget Stats panel -->
         <div id="data-budget-panel">
-            <!-- Source attribution -->
             <div class="card2 flex items-center gap-2 px-3 py-2 mb-3" style="font-size:9px;color:var(--subtext);">
                 <span>🔗 Source:</span>
-                <a href="https://f1fantasytools.com/budget-builder" target="_blank" rel="noopener"
-                   style="color:#3a86ff;text-decoration:none;word-break:break-all;"
-                   onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
-                    f1fantasytools.com/budget-builder
-                </a>
+                <a href="https://f1fantasytools.com/budget-builder" target="_blank" rel="noopener" style="color:#3a86ff;text-decoration:none;">f1fantasytools.com/budget-builder</a>
                 <span id="data-sim-label" style="margin-left:auto;color:var(--muted);font-size:8px;white-space:nowrap;flex-shrink:0;"></span>
             </div>
-
-            <!-- Drivers / Constructors toggle -->
             <div class="flex rounded-xl p-1 gap-1 mb-3" style="background:#f5f4fa;border:1px solid #e2e0ee;display:inline-flex;">
-                <button id="data-tab-drivers" onclick="setDataTab('drivers')"
-                    class="data-tab-btn px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all"
-                    style="background:#ffffff;color:var(--text)">Drivers</button>
-                <button id="data-tab-constructors" onclick="setDataTab('constructors')"
-                    class="data-tab-btn px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all"
-                    style="color:var(--muted)">Constructors</button>
+                <button id="data-tab-drivers" onclick="setDataTab('drivers')" class="data-tab-btn px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all" style="background:#ffffff;color:var(--text)">Drivers</button>
+                <button id="data-tab-constructors" onclick="setDataTab('constructors')" class="data-tab-btn px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all" style="color:var(--muted)">Constructors</button>
             </div>
-
             <p class="text-[8px] mb-2 px-1 uppercase tracking-widest" style="color:var(--muted)">Tap column header to sort ↕</p>
-
-            <!-- Table container -->
             <div class="card overflow-hidden mb-3" id="data-budget-table-wrap">
                 <div id="data-budget-table">
-                    <!-- skeleton -->
                     <div class="skeleton" style="height:40px;border-radius:0;margin-bottom:1px;opacity:.5"></div>
                     <div class="skeleton" style="height:36px;border-radius:0;margin-bottom:1px;opacity:.4"></div>
-                    <div class="skeleton" style="height:36px;border-radius:0;margin-bottom:1px;opacity:.35"></div>
                     <div class="skeleton" style="height:36px;border-radius:0;opacity:.3"></div>
                 </div>
             </div>
-
-            <!-- No-data / error state -->
             <div id="data-budget-error" style="display:none;" class="card2 p-4 text-center mb-3">
                 <div style="font-size:24px;margin-bottom:6px;">⚠️</div>
                 <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Data not available</div>
-                <div class="text-[9px]" style="color:var(--subtext)">
-                    Run the scraper to generate <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_budget_data.json</code>, then push to GitHub.
-                </div>
+                <div class="text-[9px]" style="color:var(--subtext)">Run the scraper to generate <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_budget_data.json</code>.</div>
             </div>
         </div>
 
-        <!-- Fantasy Data panel -->
+        <!-- Fantasy Prices & Points panel -->
         <div id="data-fantasy-panel" style="display:none;">
             <div class="card2 flex items-center gap-2 px-3 py-2 mb-3" style="font-size:9px;color:var(--subtext);">
-                <span>🔗 Source:</span>
-                <a href="https://fantasy.formula1.com" target="_blank" rel="noopener" style="color:#3a86ff;text-decoration:none;">fantasy.formula1.com</a>
+                <span>🔗 fantasy.formula1.com</span>
                 <span id="fantasy-updated-chip" style="margin-left:auto;color:var(--muted);font-size:8px;"></span>
             </div>
-            <!-- Gameweek selector -->
-            <div style="position:relative;margin-bottom:12px;">
-                <select id="fantasy-gw-select" onchange="renderFantasyTable()" style="padding:9px 28px 9px 10px;"></select>
+            <!-- Overall / Round toggle -->
+            <div style="position:relative;margin-bottom:10px;">
+                <select id="fantasy-round-select" onchange="renderFantasyTable()" style="padding:9px 28px 9px 10px;"></select>
                 <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
             </div>
-            <!-- Drivers/Constructors toggle -->
             <div class="flex rounded-xl p-1 gap-1 mb-3" style="background:#f5f4fa;border:1px solid #e2e0ee;display:inline-flex;">
-                <button id="fantasy-tab-drivers" onclick="setFantasyTab('drivers')"
-                    class="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all"
-                    style="background:#ffffff;color:var(--text)">Drivers</button>
-                <button id="fantasy-tab-constructors" onclick="setFantasyTab('constructors')"
-                    class="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all"
-                    style="color:var(--muted)">Teams</button>
+                <button id="fantasy-tab-drivers" onclick="setFantasyTab('drivers')" class="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all" style="background:#ffffff;color:var(--text)">Drivers</button>
+                <button id="fantasy-tab-constructors" onclick="setFantasyTab('constructors')" class="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all" style="color:var(--muted)">Teams</button>
             </div>
             <p class="text-[8px] mb-2 px-1 uppercase tracking-widest" style="color:var(--muted)">Tap column header to sort ↕</p>
             <div class="card overflow-hidden mb-3"><div id="fantasy-table"></div></div>
             <div id="fantasy-error" style="display:none;" class="card2 p-4 text-center mb-3">
                 <div style="font-size:22px;margin-bottom:6px;">🔐</div>
                 <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Fantasy data not synced</div>
-                <div class="text-[9px]" style="color:var(--subtext)">Run the <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_fantasy_sync</code> GitHub Action to pull data from the F1 Fantasy API.</div>
+                <div class="text-[9px]" style="color:var(--subtext)">Run <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">run_fantasy_sync.bat</code> to pull data.</div>
             </div>
         </div>
 
         <!-- League Teams panel -->
         <div id="data-teams-panel" style="display:none;">
             <div class="card2 flex items-center gap-2 px-3 py-2 mb-3" style="font-size:9px;color:var(--subtext);">
-                <span>🏁 Baby Formula Championship · League Teams</span>
+                <span>🏁 Baby Formula Championship · Team Picks</span>
                 <span id="teams-updated-chip" style="margin-left:auto;color:var(--muted);font-size:8px;"></span>
             </div>
-            <!-- Player selector -->
+            <!-- Overall / Round toggle -->
             <div style="position:relative;margin-bottom:10px;">
-                <select id="teams-player-select" onchange="renderTeamsPanel()" style="padding:9px 28px 9px 10px;"></select>
-                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
-            </div>
-            <!-- Round selector -->
-            <div style="position:relative;margin-bottom:12px;">
                 <select id="teams-round-select" onchange="renderTeamsPanel()" style="padding:9px 28px 9px 10px;"></select>
                 <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
             </div>
-            <!-- Budget + points summary -->
-            <div class="grid grid-cols-3 gap-2 mb-3" id="teams-summary"></div>
-            <!-- Team picks table -->
+            <!-- Player selector (shown only in per-round view) -->
+            <div id="teams-player-wrap" style="position:relative;margin-bottom:12px;display:none;">
+                <select id="teams-player-select" onchange="renderTeamsPanel()" style="padding:9px 28px 9px 10px;"></select>
+                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+            </div>
+            <div id="teams-summary" class="grid grid-cols-3 gap-2 mb-3"></div>
             <div class="card overflow-hidden mb-3"><div id="teams-picks-table"></div></div>
             <div id="teams-error" style="display:none;" class="card2 p-4 text-center mb-3">
                 <div style="font-size:22px;margin-bottom:6px;">🔐</div>
                 <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Team data not synced</div>
-                <div class="text-[9px]" style="color:var(--subtext)">Run the <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_fantasy_sync</code> GitHub Action to pull league data.</div>
+                <div class="text-[9px]" style="color:var(--subtext)">Run <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">run_fantasy_sync.bat</code> to pull league data.</div>
             </div>
         </div>
     </div>
@@ -288,225 +269,209 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// STATIC CONFIG — fallback data if history.json hasn't loaded yet
+// PLAYER CONFIG — static metadata (colors, emojis, owner names)
 // ═══════════════════════════════════════════════════════════════════
 const PLAYER_CONFIG = {
-    kevcedes: { id:'kevcedes', name:'Kevcedes',     owner:'Kevin Liang',    emoji:'⚡', color:'#f4a100' },
-    grahhh:   { id:'grahhh',   name:'GRAHHH racing',owner:'Vivian Nguyen',  emoji:'🔥', color:'#ff4757' },
-    leclaren: { id:'leclaren', name:'LeClaren F1',  owner:'Selina Le Khac', emoji:'🧡', color:'#3a86ff' },
-    juice:    { id:'juice',    name:'RACING JUICE', owner:'Justin Tran',    emoji:'🍊', color:'#2ec4b6' },
-    thumbi:   { id:'thumbi',  name:'Thumbi',        owner:'Thomas George',  emoji:'👍', color:'#c77dff' },
+    kevcedes: { id:'kevcedes', name:'Kevcedes',     owner:'Kevin Liang',    emoji:'🗿', color:'#f4a100' },
+    grahhh:   { id:'grahhh',   name:'GRAHHH racing',owner:'Vivian Nguyen',  emoji:'🐥', color:'#ff4757' },
+    leclaren: { id:'leclaren', name:'LeClaren F1',  owner:'Selina Le Khac', emoji:'👽', color:'#3a86ff' },
+    juice:    { id:'juice',    name:'RACING JUICE', owner:'Justin Tran',    emoji:'👑', color:'#2ec4b6' },
+    thumbi:   { id:'thumbi',  name:'Thumbi',        owner:'Thomas George',  emoji:'🍄', color:'#c77dff' },
 };
 
+// Maps f1_teams.json player IDs → PLAYER_CONFIG keys
+const PLAYER_ID_MAP = {
+    '232016281': 'kevcedes',
+    '191134213': 'grahhh',
+    '178336081': 'juice',
+    '178339760': 'leclaren',
+    '178798446': 'thumbi',
+};
 
 const TEAM_COLORS = {
-    'Mercedes':'#00d2be','Ferrari':'#e8002d','Red Bull':'#3671c6',
+    'Mercedes':'#00d2be','Ferrari':'#e8002d','Red Bull Racing':'#3671c6',
     'McLaren':'#ff8000','Aston Martin':'#358c75','Alpine':'#0093cc',
-    'Williams':'#005aff','Haas':'#888888','Audi':'#52e252',
+    'Williams':'#005aff','Haas F1 Team':'#888888','Audi':'#52e252',
     'Racing Bulls':'#6692ff','Cadillac':'#cc0000',
 };
-
+const TEAM_TAG_COLORS = {
+    'MER':'#00d2be','FER':'#e8002d','RBR':'#3671c6','MCL':'#ff8000',
+    'AST':'#358c75','ALP':'#0093cc','WIL':'#005aff','HAA':'#888888',
+    'AUD':'#52e252','RBS':'#6692ff','CAD':'#cc0000',
+    'RUS':'#00d2be','ANT':'#00d2be','LEC':'#e8002d','HAM':'#e8002d',
+    'VER':'#3671c6','HAD':'#3671c6','NOR':'#ff8000','PIA':'#ff8000',
+    'ALO':'#358c75','STR':'#358c75','GAS':'#0093cc','COL':'#0093cc',
+    'SAI':'#005aff','ALB':'#005aff','BEA':'#888888','OCO':'#888888',
+    'HUL':'#52e252','BOR':'#52e252','LAW':'#6692ff','LIN':'#6692ff',
+    'BOT':'#cc0000','PER':'#cc0000',
+};
 const MEDAL_COLOR = ['#f4a100','#9a9aaa','#cd7f32'];
-const MEDAL       = ['🥇','🥈','🥉'];
+const MEDAL = ['🥇','🥈','🥉'];
 
 // ═══════════════════════════════════════════════════════════════════
-// APP STATE — populated from history.json
+// STATE
 // ═══════════════════════════════════════════════════════════════════
-let DB      = null;
-let ROUNDS  = [];
-let PLAYERS = {};
+let DB        = null;   // history.json
+let ROUNDS    = [];     // from history.json
+let PLAYERS   = {};     // merged player config
+let F1_TEAMS  = null;   // f1_teams.json
+let F1_FANTASY= null;   // f1_fantasy.json
+let F1_DATA   = null;   // f1_budget_data.json
 
 // ═══════════════════════════════════════════════════════════════════
-// DATA LOADING
+// BANNER HELPERS
 // ═══════════════════════════════════════════════════════════════════
-async function syncData() {
+function showBanner(type, msg) {
     const banner = document.getElementById('sync-banner');
-    const btn    = document.getElementById('sync-btn');
+    banner.className = `show ${type}`;
+    banner.textContent = msg;
+    if (type !== 'loading') setTimeout(() => banner.classList.remove('show'), 3500);
+}
+function hideBanner() { document.getElementById('sync-banner').classList.remove('show'); }
 
-    const showBanner = (type, msg) => {
-        banner.className = `show ${type}`;
-        banner.textContent = msg;
-        if (type !== 'loading') setTimeout(() => banner.classList.remove('show'), 3500);
-    };
-
-    showBanner('loading', '🔄 Loading history.json…');
+// ═══════════════════════════════════════════════════════════════════
+// SYNC ALL
+// ═══════════════════════════════════════════════════════════════════
+async function syncAll() {
+    const btn = document.getElementById('sync-btn');
     btn.textContent = '⏳ Loading…';
-    btn.disabled    = true;
+    btn.disabled = true;
+    showBanner('loading', '🔄 Syncing all data…');
+    try {
+        await Promise.all([syncHistory(), syncF1Teams(), syncF1Fantasy()]);
+        showBanner('success', `✅ All data synced · ${new Date().toLocaleTimeString()}`);
+    } catch(e) {
+        showBanner('error', '⚠️ Some data failed to load');
+    } finally {
+        btn.textContent = '🔄 Sync';
+        btn.disabled = false;
+    }
+}
 
+async function syncHistory() {
     try {
         const res = await fetch('./history.json', { cache:'no-cache' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         DB = await res.json();
-        applyHistory(DB);
-        showBanner('success', `✅ Synced! ${ROUNDS.length} round(s) loaded · ${new Date().toLocaleTimeString()}`);
-    } catch (err) {
-        console.warn('Sync error:', err);
-        showBanner('error', '⚠️ Could not load history.json — using seed data.');
-        applyHistory(null);
-    } finally {
-        btn.textContent = '🔄 Sync';
-        btn.disabled    = false;
+    } catch(e) { DB = null; }
+    applyHistory(DB);
+}
+
+async function syncF1Teams() {
+    try {
+        const res = await fetch('./f1_teams.json', { cache:'no-cache' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        F1_TEAMS = await res.json();
+        populateTeamsDropdowns();
+        renderTeamsPanel();
+        renderHomeWeekly();
+        document.getElementById('teams-error').style.display = 'none';
+    } catch(e) {
+        console.warn('f1_teams.json not found:', e);
     }
 }
 
+async function syncF1Fantasy() {
+    try {
+        const res = await fetch('./f1_fantasy.json', { cache:'no-cache' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        F1_FANTASY = await res.json();
+        populateFantasyRounds();
+        renderFantasyTable();
+        document.getElementById('fantasy-error').style.display = 'none';
+    } catch(e) {
+        console.warn('f1_fantasy.json not found:', e);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HISTORY.JSON → STANDINGS + H2H
+// ═══════════════════════════════════════════════════════════════════
 function applyHistory(db) {
-    // Merge player registry
     PLAYERS = { ...PLAYER_CONFIG };
     if (db?.players) {
         Object.entries(db.players).forEach(([k, v]) => {
             if (PLAYERS[k]) PLAYERS[k] = { ...PLAYERS[k], ...v };
         });
     }
-
-    // Load rounds
     ROUNDS = db?.rounds ? [...db.rounds].sort((a,b) => a.round - b.round) : [];
-
-    // If no rounds from DB, seed with R01 fallback
     if (!ROUNDS.length) ROUNDS = [SEED_ROUND];
 
-    // Populate round dropdowns
     populateRoundDropdowns();
 
-    // Update header subtitle
     const latest = ROUNDS[ROUNDS.length - 1];
     document.getElementById('header-subtitle').textContent =
-        `2026 Season · ${latest.key} · ${latest.gp} ${latest.flag}`;
+        `2026 Season · ${latest.key||'R0?'} · ${latest.gp||''} ${latest.flag||''}`;
 
-    // Render all sections
     renderStandings();
     renderH2H();
-    populateScheduleDropdown();
 }
 
-// Seed round — used if history.json not yet available
-const SEED_ROUND = {
-    round:1, key:'R01', label:'R01 · Australian GP 🇦🇺', flag:'🇦🇺', gp:'Australian GP', date:'2026-03-16',
-    standings:[
-        {player_key:'kevcedes',player_name:'Kevcedes',    owner:'Kevin Liang',    points:240,race_points:240,team_value:102.4},
-        {player_key:'grahhh',  player_name:'GRAHHH racing',owner:'Vivian Nguyen',  points:230,race_points:230,team_value:100.8},
-        {player_key:'leclaren',player_name:'LeClaren F1', owner:'Selina Le Khac', points:222,race_points:222,team_value:101.5},
-        {player_key:'juice',   player_name:'RACING JUICE',owner:'Justin Tran',    points:195,race_points:195,team_value:99.2},
-        {player_key:'thumbi',  player_name:'Thumbi',      owner:'Thomas George',  points:195,race_points:195,team_value:100.1},
-    ],
-    drivers:[
-        {name:'G. Russell',   full:'George Russell',   team:'Mercedes',     price:27.4,pts:78, delta:0.6, sel:41.2},
-        {name:'K. Antonelli', full:'Kimi Antonelli',   team:'Mercedes',     price:23.2,pts:44, delta:0.2, sel:28.7},
-        {name:'C. Leclerc',   full:'Charles Leclerc',  team:'Ferrari',      price:26.5,pts:32, delta:0.3, sel:30.1},
-        {name:'L. Hamilton',  full:'Lewis Hamilton',   team:'Ferrari',      price:29.0,pts:28, delta:0.1, sel:35.4},
-        {name:'M. Verstappen',full:'Max Verstappen',   team:'Red Bull',     price:32.0,pts:38, delta:-0.2,sel:38.9},
-        {name:'I. Hadjar',    full:'Isack Hadjar',     team:'Red Bull',     price:14.0,pts:-8, delta:-0.3,sel:12.3},
-        {name:'L. Norris',    full:'Lando Norris',     team:'McLaren',      price:28.0,pts:18, delta:-0.4,sel:29.5},
-        {name:'O. Piastri',   full:'Oscar Piastri',    team:'McLaren',      price:25.5,pts:0,  delta:-0.8,sel:26.2},
-        {name:'F. Alonso',    full:'Fernando Alonso',  team:'Aston Martin', price:20.0,pts:-5, delta:-0.2,sel:18.6},
-        {name:'L. Stroll',    full:'Lance Stroll',     team:'Aston Martin', price:11.0,pts:-3, delta:-0.1,sel:7.2},
-        {name:'P. Gasly',     full:'Pierre Gasly',     team:'Alpine',       price:15.0,pts:12, delta:0,   sel:14.3},
-        {name:'F. Colapinto', full:'Franco Colapinto', team:'Alpine',       price:10.5,pts:3,  delta:0,   sel:9.8},
-        {name:'C. Sainz',     full:'Carlos Sainz',     team:'Williams',     price:22.0,pts:-4, delta:-0.2,sel:22.8},
-        {name:'A. Albon',     full:'Alex Albon',       team:'Williams',     price:14.5,pts:5,  delta:0,   sel:11.3},
-        {name:'O. Bearman',   full:'Oliver Bearman',   team:'Haas',         price:12.5,pts:20, delta:0.2, sel:16.4},
-        {name:'E. Ocon',      full:'Esteban Ocon',     team:'Haas',         price:13.0,pts:6,  delta:0,   sel:10.5},
-        {name:'N. Hulkenberg',full:'Nico Hulkenberg',  team:'Audi',         price:13.5,pts:0,  delta:-0.2,sel:8.9},
-        {name:'G. Bortoleto', full:'Gabriel Bortoleto',team:'Audi',         price:10.0,pts:8,  delta:0.1, sel:6.3},
-        {name:'L. Lawson',    full:'Liam Lawson',      team:'Racing Bulls',  price:14.5,pts:5,  delta:-0.1,sel:11.2},
-        {name:'A. Lindblad',  full:'Arvid Lindblad',   team:'Racing Bulls',  price:9.5, pts:15, delta:0.3, sel:22.1},
-        {name:'V. Bottas',    full:'Valtteri Bottas',  team:'Cadillac',     price:10.5,pts:-5, delta:-0.1,sel:5.1},
-        {name:'S. Perez',     full:'Sergio Perez',     team:'Cadillac',     price:11.0,pts:2,  delta:0,   sel:4.8},
-    ],
-    constructors:[
-        {name:'Mercedes',     price:34.5,pts:96, delta:0.8, sel:29.8},
-        {name:'Ferrari',      price:30.5,pts:42, delta:0.5, sel:24.2},
-        {name:'Red Bull',     price:27.0,pts:-3, delta:-0.1,sel:20.1},
-        {name:'McLaren',      price:28.5,pts:-5, delta:-0.3,sel:18.7},
-        {name:'Aston Martin', price:19.0,pts:-8, delta:-0.2,sel:12.4},
-        {name:'Alpine',       price:13.0,pts:15, delta:0.1, sel:8.6},
-        {name:'Williams',     price:14.5,pts:1,  delta:-0.1,sel:10.3},
-        {name:'Haas',         price:13.5,pts:34, delta:0.3, sel:9.2},
-        {name:'Audi',         price:11.0,pts:8,  delta:0.1, sel:5.4},
-        {name:'Racing Bulls', price:12.5,pts:20, delta:0.2, sel:7.1},
-        {name:'Cadillac',     price:8.5, pts:-3, delta:0,   sel:3.2},
-    ],
-};
-
 // ═══════════════════════════════════════════════════════════════════
-// ROUND DROPDOWN HELPERS
+// ROUND DROPDOWNS
 // ═══════════════════════════════════════════════════════════════════
 function populateRoundDropdowns() {
-    // Standings dropdown
+    // Standings
     const sSelect = document.getElementById('standings-round-select');
     sSelect.innerHTML = '<option value="overall">📊 Overall</option>';
     [...ROUNDS].reverse().forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r.round;
-        opt.textContent = r.label;
-        sSelect.appendChild(opt);
+        const o = document.createElement('option');
+        o.value = r.round;
+        o.textContent = r.label || `R${String(r.round).padStart(2,'0')} · ${r.gp}`;
+        sSelect.appendChild(o);
     });
-    // Default to latest round
     if (ROUNDS.length) sSelect.value = ROUNDS[ROUNDS.length - 1].round;
 
-    // H2H dropdowns — player names
+    // H2H players
     ['h2h-left','h2h-right'].forEach((id, i) => {
         const sel = document.getElementById(id);
-        sel.innerHTML = Object.values(PLAYERS).map((p,idx) =>
-            `<option value="${p.id}" ${i === 1 && idx === 1 ? 'selected' : ''}>${p.emoji} ${p.name}</option>`
+        sel.innerHTML = Object.values(PLAYERS).map((p, idx) =>
+            `<option value="${p.id}" ${i===1&&idx===1?'selected':''}>${p.emoji} ${p.name}</option>`
         ).join('');
     });
+
+    // H2H round
+    const hSel = document.getElementById('h2h-round-select');
+    hSel.innerHTML = '<option value="overall">📊 Overall Season</option>';
+    [...ROUNDS].reverse().forEach(r => {
+        const o = document.createElement('option');
+        o.value = r.round;
+        o.textContent = r.label || `R${String(r.round).padStart(2,'0')} · ${r.gp}`;
+        hSel.appendChild(o);
+    });
+    if (ROUNDS.length) hSel.value = ROUNDS[ROUNDS.length - 1].round;
 }
 
-// ─── Get standings for a given round selection ─────────────────────
-// Returns array sorted by points desc, with pos, movement, gapAbove, gapP1
+// ─── Helper: get standings array for a given round selection ───
 function getStandingsForView(roundVal) {
     const isOverall = roundVal === 'overall';
-
     if (isOverall) {
-        // Sum points across all rounds
         const totals = {};
         Object.keys(PLAYERS).forEach(k => { totals[k] = { points:0, race_points:0, team_value:0 }; });
         ROUNDS.forEach(r => {
             r.standings.forEach(s => {
                 if (!totals[s.player_key]) totals[s.player_key] = { points:0, race_points:0, team_value:0 };
-                totals[s.player_key].points      += s.points;
-                totals[s.player_key].race_points  = s.race_points; // latest race
-                totals[s.player_key].team_value   = s.team_value;  // latest value
+                totals[s.player_key].points += s.points;
+                totals[s.player_key].race_points = s.race_points;
+                totals[s.player_key].team_value  = s.team_value;
             });
         });
         return Object.entries(totals)
             .map(([k, v]) => ({ player_key:k, points:v.points, race_points:v.race_points, team_value:v.team_value }))
             .sort((a,b) => b.points - a.points)
             .map((s, i, arr) => ({
-                ...s,
-                pos:       i + 1,
-                movement:  0,
-                gapAbove:  i > 0 ? s.points - arr[i-1].points : null,
-                gapP1:     s.points - arr[0].points,
+                ...s, pos:i+1, movement:0,
+                gapAbove: i > 0 ? s.points - arr[i-1].points : null,
+                gapP1:    s.points - arr[0].points,
             }));
     }
-
-    // Single round
     const round = ROUNDS.find(r => r.round === parseInt(roundVal));
     if (!round) return [];
-
-    // Previous round for movement
-    const prevRound = ROUNDS.find(r => r.round === round.round - 1);
-
-    return round.standings.map((s, i, arr) => {
-        let movement = 0;
-        if (prevRound) {
-            const prevStandings = prevRound.standings;
-            // Overall points up to this round
-            const overallSorted = computeOverallAtRound(round.round);
-            const prevOverall   = computeOverallAtRound(round.round - 1);
-            const oldPos = prevOverall.findIndex(x => x.player_key === s.player_key);
-            const newPos = overallSorted.findIndex(x => x.player_key === s.player_key);
-            movement = oldPos >= 0 ? oldPos - newPos : 0;
-        }
-        return {
-            ...s,
-            pos:      i + 1,
-            movement,
-            gapAbove: i > 0 ? s.points - arr[i-1].points : null,
-            gapP1:    s.points - arr[0].points,
-        };
-    });
+    return round.standings.map((s, i, arr) => ({
+        ...s, pos:i+1, movement:0,
+        gapAbove: i > 0 ? s.points - arr[i-1].points : null,
+        gapP1:    s.points - arr[0].points,
+    }));
 }
 
 function computeOverallAtRound(maxRound) {
@@ -517,13 +482,11 @@ function computeOverallAtRound(maxRound) {
             totals[s.player_key] += s.points;
         });
     });
-    return Object.entries(totals)
-        .map(([k,v]) => ({ player_key:k, points:v }))
-        .sort((a,b) => b.points - a.points);
+    return Object.entries(totals).map(([k,v]) => ({ player_key:k, points:v })).sort((a,b) => b.points - a.points);
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// RENDER — STANDINGS
+// RENDER — HOME STANDINGS (expandable team cards)
 // ═══════════════════════════════════════════════════════════════════
 function renderStandings() {
     const roundVal  = document.getElementById('standings-round-select').value;
@@ -531,117 +494,216 @@ function renderStandings() {
     const standings = getStandingsForView(roundVal);
     if (!standings.length) return;
 
+    // For each player, get their picks for this round from f1_teams.json
+    const getTeamPicks = (playerKey, roundNum) => {
+        if (!F1_TEAMS || isOverall) return null;
+        const playerId = Object.entries(PLAYER_ID_MAP).find(([,v]) => v === playerKey)?.[0];
+        if (!playerId) return null;
+        const roundData = F1_TEAMS.rounds?.find(r => r.round === parseInt(roundNum));
+        if (!roundData) return null;
+        return roundData.teams?.find(t => t.player_id === playerId) || null;
+    };
+
     const el = document.getElementById('standings-table');
     el.innerHTML = standings.map((s, i) => {
-        const p       = PLAYERS[s.player_key] || {};
-        const mc      = i < 3 ? MEDAL_COLOR[i] : (p.color || '#aaa');
-        const movArrow = s.movement > 0 ? '↑' : s.movement < 0 ? '↓' : '—';
-        const movColor = s.movement > 0 ? '#2ec4b6' : s.movement < 0 ? '#ff4757' : '#9090b8';
-        const movAbs   = Math.abs(s.movement);
+        const p = PLAYERS[s.player_key] || {};
+        const mc = i < 3 ? MEDAL_COLOR[i] : (p.color || '#aaa');
+        const ptsLabel = isOverall ? `${s.points}` : `${s.race_points ?? s.points}`;
+        const teamData = getTeamPicks(s.player_key, roundVal);
+        const hasPicks = teamData?.picks?.length > 0;
 
-        // Points label — race pts for single round, total for overall
-        const ptsLabel = isOverall
-            ? `${s.points}`
-            : `${s.race_points ?? s.points}`;
+        // Build picks mini-display
+        let picksHtml = '';
+        if (hasPicks) {
+            const drivers = teamData.picks.filter(pk => pk.type === 'driver');
+            const constrs = teamData.picks.filter(pk => pk.type === 'constructor');
+            const pickRow = (items) => items.map(pk => {
+                const tc = TEAM_TAG_COLORS[pk.team_tag] || '#9090b8';
+                const star = pk.is_star ? '⭐' : '';
+                return `<span style="background:${tc}22;color:${tc};font-size:8px;font-weight:bold;padding:1px 5px;border-radius:5px;margin:1px;display:inline-block;">${star}${pk.short_name}</span>`;
+            }).join('');
+            picksHtml = `
+            <div class="team-card-detail">
+                <div class="text-[8px] uppercase tracking-widest mb-1.5" style="color:var(--muted)">Drivers</div>
+                <div class="mb-2">${pickRow(drivers)}</div>
+                <div class="text-[8px] uppercase tracking-widest mb-1.5" style="color:var(--muted)">Constructors</div>
+                <div class="mb-1">${pickRow(constrs)}</div>
+                ${teamData.team_value ? `<div class="text-[8px] mt-2" style="color:var(--muted)">Team value: <span style="color:var(--subtext)">$${teamData.team_value}M</span></div>` : ''}
+            </div>`;
+        }
+
+        const clickable = hasPicks ? `onclick="toggleTeamCard(this)" style="cursor:pointer;"` : '';
 
         return `
-        <div class="prow px-4 py-3 flex items-center gap-3" style="border-left:3px solid ${mc};animation-delay:${i*0.05}s">
-            <div class="w-7 text-center flex-shrink-0">
-                ${i < 3
-                    ? `<span class="text-xl leading-none">${MEDAL[i]}</span>`
-                    : `<span class="fun text-base" style="color:${p.color}">${s.pos}</span>`}
+        <div class="team-card prow" style="animation-delay:${i*0.05}s">
+            <div class="px-4 py-3 flex items-center gap-3" ${clickable}>
+                <div class="w-7 text-center flex-shrink-0">
+                    ${i < 3
+                        ? `<span class="text-xl leading-none">${MEDAL[i]}</span>`
+                        : `<span class="fun text-base" style="color:${p.color}">${s.pos}</span>`}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="fun text-[15px] leading-tight truncate" style="color:${p.color || '#aaa'}">${p.emoji||''} ${p.name || s.player_key}</div>
+                    <div class="text-[9px] truncate" style="color:var(--subtext)">${p.owner || ''}</div>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <div class="fun text-base leading-none" style="color:${mc}">${ptsLabel}</div>
+                    ${i === 0
+                        ? `<div class="text-[9px] font-bold mt-0.5" style="color:var(--gold)">LEADER</div>`
+                        : `<div class="text-[9px] mt-0.5 font-mono">
+                               <span style="color:#ff6b35">${s.gapAbove ?? ''}</span>
+                               <span style="color:#d0cee8"> | </span>
+                               <span style="color:#ff4757">${s.gapP1}</span>
+                           </div>`}
+                </div>
+                ${hasPicks ? `<div class="team-card-chevron">▼</div>` : '<div class="w-4"></div>'}
             </div>
-            <div class="flex-1 min-w-0">
-                <div class="fun text-[15px] leading-tight truncate" style="color:${p.color || '#aaa'}">${p.name || s.player_key}</div>
-                <div class="text-[9px] truncate" style="color:var(--subtext)">${p.owner || ''}</div>
-            </div>
-            <div class="text-right flex-shrink-0">
-                <div class="fun text-base leading-none" style="color:${mc}">${ptsLabel}</div>
-                ${i === 0
-                    ? `<div class="text-[9px] font-bold mt-0.5" style="color:var(--gold)">LEADER</div>`
-                    : `<div class="text-[9px] mt-0.5 font-mono">
-                           <span style="color:#ff6b35">${s.gapAbove ?? ''}</span>
-                           <span style="color:#d0cee8"> | </span>
-                           <span style="color:#ff4757">${s.gapP1}</span>
-                       </div>`}
-            </div>
-            <div class="w-7 text-center flex-shrink-0">
-                <span class="text-xs font-bold" style="color:${movColor}">${movArrow}${movAbs > 0 ? movAbs : ''}</span>
-            </div>
+            ${picksHtml}
         </div>`;
     }).join('');
 
-    // Update quick-stats cards
-    const latest      = ROUNDS[ROUNDS.length - 1];
-    const topS        = standings[0];
-    const topP        = PLAYERS[topS.player_key] || {};
-    const racePts     = isOverall
-        ? latest?.standings?.slice().sort((a,b) => b.race_points - a.race_points)
-        : standings.slice().sort((a,b) => (b.race_points??0) - (a.race_points??0));
-    const bestS  = racePts?.[0];
+    // Quick stats
+    const latest = ROUNDS[ROUNDS.length - 1];
+    const topS   = standings[0];
+    const topP   = PLAYERS[topS.player_key] || {};
+    const allPts = standings.slice().sort((a,b) => (b.race_points??b.points) - (a.race_points??a.points));
+    const bestS  = allPts[0];
     const bestP  = PLAYERS[bestS?.player_key] || {};
-    const worstS = racePts?.[racePts.length - 1];
+    const worstS = allPts[allPts.length-1];
     const worstP = PLAYERS[worstS?.player_key] || {};
 
     document.getElementById('home-stats').innerHTML = `
         <div class="card p-3 text-center">
             <div class="text-xl">🏆</div>
             <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Leader</div>
-            <div class="fun text-sm mt-0.5" style="color:var(--gold)">${topP.name || '—'}</div>
+            <div class="fun text-sm mt-0.5" style="color:var(--gold)">${topP.name||'—'}</div>
             <div class="text-[9px] mt-0.5" style="color:var(--muted)">${topS.points} pts</div>
         </div>
         <div class="card p-3 text-center">
             <div class="text-xl">🔥</div>
-            <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Best ${isOverall ? 'Total' : 'Race'}</div>
-            <div class="fun text-sm mt-0.5" style="color:#ff4757">${bestP.name || '—'}</div>
-            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${bestS?.race_points ?? bestS?.points ?? '—'} pts</div>
+            <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Best ${isOverall?'Total':'Race'}</div>
+            <div class="fun text-sm mt-0.5" style="color:#ff4757">${bestP.name||'—'}</div>
+            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${bestS?.race_points??bestS?.points??'—'} pts</div>
         </div>
         <div class="card p-3 text-center">
             <div class="text-xl">💀</div>
-            <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Worst ${isOverall ? 'Total' : 'Race'}</div>
-            <div class="fun text-sm mt-0.5" style="color:#c77dff">${worstP.name || '—'}</div>
-            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${worstS?.race_points ?? worstS?.points ?? '—'} pts</div>
+            <div class="text-[8px] mt-1 uppercase" style="color:var(--muted)">Worst ${isOverall?'Total':'Race'}</div>
+            <div class="fun text-sm mt-0.5" style="color:#c77dff">${worstP.name||'—'}</div>
+            <div class="text-[9px] mt-0.5" style="color:var(--muted)">${worstS?.race_points??worstS?.points??'—'} pts</div>
         </div>`;
+}
+
+function toggleTeamCard(header) {
+    const card = header.closest('.team-card');
+    card.classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER — HOME WEEKLY (latest round team points from f1_teams.json)
+// ═══════════════════════════════════════════════════════════════════
+function renderHomeWeekly() {
+    if (!F1_TEAMS) return;
+    const confirmedRounds = (F1_TEAMS.rounds || []).filter(r => r.confirmed && r.teams?.length > 0);
+    if (!confirmedRounds.length) return;
+
+    const latest = confirmedRounds[confirmedRounds.length - 1];
+    const section = document.getElementById('home-weekly-section');
+    const title   = document.getElementById('home-weekly-title');
+    const table   = document.getElementById('home-weekly-table');
+
+    section.style.display = '';
+    title.textContent = `${GP_FLAGS[latest.gp]||'🏁'} ${latest.gp || `Round ${latest.round}`} — Team Points`;
+
+    // Sort teams by total_points desc
+    const teams = [...latest.teams].filter(t => t.total_points != null).sort((a,b) => b.total_points - a.total_points);
+
+    if (!teams.length) {
+        table.innerHTML = '<div class="p-4 text-center text-[10px]" style="color:var(--muted)">Points not yet confirmed for this round.</div>';
+        return;
+    }
+
+    table.innerHTML = teams.map((t, i) => {
+        const pid = PLAYER_ID_MAP[t.player_id] || t.player_id;
+        const p   = PLAYERS[pid] || { name: t.player_id, color:'#aaa', emoji:'👤' };
+        const mc  = i < 3 ? MEDAL_COLOR[i] : (p.color || '#aaa');
+
+        // Get drivers for this team
+        const drivers = (t.picks||[]).filter(pk => pk.type==='driver').map(pk => {
+            const tc = TEAM_TAG_COLORS[pk.team_tag] || '#9090b8';
+            return `<span style="background:${tc}22;color:${tc};font-size:8px;font-weight:bold;padding:1px 5px;border-radius:4px;">${pk.is_star?'⭐':''}${pk.short_name}</span>`;
+        }).join(' ');
+        const constrs = (t.picks||[]).filter(pk => pk.type==='constructor').map(pk => {
+            const tc = TEAM_TAG_COLORS[pk.team_tag] || '#9090b8';
+            return `<span style="background:${tc}22;color:${tc};font-size:8px;font-weight:bold;padding:1px 5px;border-radius:4px;">${pk.short_name}</span>`;
+        }).join(' ');
+
+        return `
+        <div class="prow px-4 py-3" style="border-left:3px solid ${mc};animation-delay:${i*0.05}s">
+            <div class="flex items-center gap-3 mb-1.5">
+                <div class="w-6 text-center flex-shrink-0">
+                    ${i < 3 ? `<span class="text-lg">${MEDAL[i]}</span>` : `<span class="fun text-sm" style="color:${p.color}">${i+1}</span>`}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="fun text-[14px] leading-tight" style="color:${p.color}">${p.emoji} ${p.name}</div>
+                </div>
+                <div class="fun text-lg" style="color:${mc}">${t.total_points}</div>
+            </div>
+            <div class="ml-9 flex flex-wrap gap-0.5">
+                ${drivers} ${constrs}
+            </div>
+        </div>`;
+    }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // RENDER — H2H
 // ═══════════════════════════════════════════════════════════════════
 function renderH2H() {
-    const lk = document.getElementById('h2h-left').value;
-    const rk = document.getElementById('h2h-right').value;
-    const L  = PLAYERS[lk];
-    const R  = PLAYERS[rk];
+    const lk       = document.getElementById('h2h-left').value;
+    const rk       = document.getElementById('h2h-right').value;
+    const roundVal = document.getElementById('h2h-round-select').value;
+    const isOverall = roundVal === 'overall';
+    const L = PLAYERS[lk], R = PLAYERS[rk];
     const el = document.getElementById('h2h-content');
     if (!L || !R) return;
 
-    // Get overall points for each player
-    const getOverall = (key) => ROUNDS.reduce((sum, r) => {
-        const s = r.standings.find(x => x.player_key === key);
-        return sum + (s ? s.points : 0);
-    }, 0);
-    const getLatestRace = (key) => {
-        const latest = ROUNDS[ROUNDS.length - 1];
-        const s = latest?.standings.find(x => x.player_key === key);
-        return s?.race_points ?? 0;
+    // Points for selected view
+    const getPts = (key) => {
+        if (isOverall) return ROUNDS.reduce((sum, r) => { const s = r.standings.find(x => x.player_key === key); return sum + (s?.points||0); }, 0);
+        const round = ROUNDS.find(r => r.round === parseInt(roundVal));
+        return round?.standings.find(s => s.player_key === key)?.race_points ?? 0;
     };
+    const getOverallPts = (key) => ROUNDS.reduce((sum, r) => { const s = r.standings.find(x => x.player_key === key); return sum + (s?.points||0); }, 0);
     const getLatestValue = (key) => {
-        const latest = ROUNDS[ROUNDS.length - 1];
-        const s = latest?.standings.find(x => x.player_key === key);
-        return s?.team_value ?? 0;
+        const latest = ROUNDS[ROUNDS.length-1];
+        return latest?.standings.find(x => x.player_key === key)?.team_value ?? 0;
     };
     const getPos = (key) => {
-        const overall = computeOverallAtRound(ROUNDS[ROUNDS.length - 1]?.round ?? 1);
+        const overall = computeOverallAtRound(ROUNDS[ROUNDS.length-1]?.round ?? 1);
         return overall.findIndex(x => x.player_key === key) + 1;
     };
 
-    const Lpts = getOverall(lk), Rpts = getOverall(rk);
+    // Win record: how many rounds each won
+    const lWins = ROUNDS.filter(r => {
+        const ls = r.standings.find(x=>x.player_key===lk)?.race_points??0;
+        const rs = r.standings.find(x=>x.player_key===rk)?.race_points??0;
+        return ls > rs;
+    }).length;
+    const rWins = ROUNDS.filter(r => {
+        const ls = r.standings.find(x=>x.player_key===lk)?.race_points??0;
+        const rs = r.standings.find(x=>x.player_key===rk)?.race_points??0;
+        return rs > ls;
+    }).length;
+    const ties = ROUNDS.length - lWins - rWins;
+
+    const Lpts = getPts(lk), Rpts = getPts(rk);
     const gap  = Math.abs(Lpts - Rpts);
     const tied = Lpts === Rpts;
     const ahead = Lpts >= Rpts ? L : R;
-    const latest = ROUNDS[ROUNDS.length - 1];
 
-    document.getElementById('h2h-chip').textContent = latest ? latest.key : '—';
+    // Selected round label
+    const roundLabel = isOverall ? 'Overall' : (ROUNDS.find(r => r.round === parseInt(roundVal))?.label || `Round ${roundVal}`);
+    document.getElementById('h2h-chip').textContent = roundLabel;
 
     const row = (label, lv, rv, fmtL, fmtR) => {
         const lWin = lv > rv, rWin = rv > lv;
@@ -650,7 +712,7 @@ function renderH2H() {
             <div class="flex-1 text-right font-mono text-xs ${lWin?'font-bold':''}" style="${lWin?`color:${L.color}`:'color:var(--muted)'}">
                 ${fmtL ? fmtL(lv) : lv}
             </div>
-            <div class="w-24 text-center text-[8px] uppercase tracking-widest flex-shrink-0" style="color:var(--muted)">${label}</div>
+            <div class="w-28 text-center text-[8px] uppercase tracking-widest flex-shrink-0" style="color:var(--muted)">${label}</div>
             <div class="flex-1 text-left font-mono text-xs ${rWin?'font-bold':''}" style="${rWin?`color:${R.color}`:'color:var(--muted)'}">
                 ${fmtR ? fmtR(rv) : rv}
             </div>
@@ -658,6 +720,7 @@ function renderH2H() {
     };
 
     const posL = getPos(lk), posR = getPos(rk);
+
     el.innerHTML = `
     <div class="grid grid-cols-2 gap-3 mb-4">
         <div class="card p-3" style="border-left:3px solid ${L.color}">
@@ -670,15 +733,15 @@ function renderH2H() {
         </div>
     </div>
     <div class="card px-4 py-1 mb-4">
-        ${row('Position',   -posL,            -posR,            v => `P${Math.abs(v)}`,  v => `P${Math.abs(v)}`)}
-        ${row('Total Pts',  Lpts,             Rpts)}
-        ${row('Last Race',  getLatestRace(lk),getLatestRace(rk))}
-        ${row('Team Val',   getLatestValue(lk),getLatestValue(rk), v=>`$${v}M`, v=>`$${v}M`)}
-        ${row('Rounds',     ROUNDS.filter(r=>r.standings.find(s=>s.player_key===lk&&s.points>0)).length,
-                            ROUNDS.filter(r=>r.standings.find(s=>s.player_key===rk&&s.points>0)).length)}
+        ${row('Position',      -posL,              -posR,              v=>`P${Math.abs(v)}`, v=>`P${Math.abs(v)}`)}
+        ${row(isOverall ? 'Total Pts' : 'Round Pts', Lpts, Rpts)}
+        ${isOverall ? row('Overall', getOverallPts(lk), getOverallPts(rk)) : ''}
+        ${row('Team Value',    getLatestValue(lk), getLatestValue(rk), v=>`$${v}M`, v=>`$${v}M`)}
+        ${row('Round Wins',    lWins,              rWins)}
+        ${row('Ties',          ties,               ties,               v=>`${v}`, v=>`${v}`)}
     </div>
     <div class="card p-4 text-center rb-border">
-        <div class="text-[9px] uppercase tracking-widest mb-1" style="color:var(--subtext)">Points Gap</div>
+        <div class="text-[9px] uppercase tracking-widest mb-1" style="color:var(--subtext)">${isOverall ? 'Overall Gap' : 'Round Gap'}</div>
         <div class="fun text-4xl leading-none" style="color:${tied ? '#f4a100' : ahead.color}">
             ${tied ? 'TIED' : gap + ' pts'}
         </div>
@@ -690,649 +753,10 @@ function renderH2H() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// DATA PAGE — Budget Stats (scraped from f1fantasytools.com)
+// FANTASY PRICES & POINTS (f1_fantasy.json) — overall or per-round
 // ═══════════════════════════════════════════════════════════════════
-let dataMode = 'drivers';
-let dataSort = { col:'price', dir:-1 };
-let F1_DATA  = null;
-
-function setDataTab(mode) {
-    dataMode = mode;
-    ['drivers','constructors'].forEach(t => {
-        const btn = document.getElementById(`data-tab-${t}`);
-        if (t === mode) { btn.style.background='#ffffff'; btn.style.color='var(--text)'; }
-        else            { btn.style.background='';        btn.style.color='var(--muted)'; }
-    });
-    renderBudgetTable();
-}
-
-function onDataStatChange() {
-    const v = document.getElementById('data-stat-select').value;
-    document.getElementById('data-budget-panel').style.display = v === 'budget' ? '' : 'none';
-}
-
-function sortDataCol(col) {
-    if (dataSort.col === col) dataSort.dir *= -1;
-    else { dataSort.col = col; dataSort.dir = -1; }
-    renderBudgetTable();
-}
-
-async function loadF1Data() {
-    try {
-        const res = await fetch('./f1_budget_data.json', { cache:'no-cache' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        F1_DATA = await res.json();
-        renderBudgetTable();
-    } catch (e) {
-        console.warn('f1_budget_data.json not found:', e);
-        document.getElementById('data-budget-table').style.display = 'none';
-        document.getElementById('data-budget-error').style.display = '';
-        document.getElementById('data-freshness-chip').textContent = 'No data';
-    }
-}
-
-function parseNum(v) {
-    if (v == null) return -Infinity;
-    const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
-    return isNaN(n) ? -Infinity : n;
-}
-
-function renderBudgetTable() {
-    if (!F1_DATA) return;
-
-    const chip = document.getElementById('data-freshness-chip');
-    chip.textContent = F1_DATA.last_updated ? F1_DATA.last_updated.split(' ')[0] : 'Loaded';
-    const simEl = document.getElementById('data-sim-label');
-    if (simEl) simEl.textContent = F1_DATA.simulation_label || '';
-
-    const raw = (dataMode === 'drivers' ? (F1_DATA.drivers || []) : (F1_DATA.constructors || []));
-
-    if (!raw.length) {
-        document.getElementById('data-budget-error').style.display = '';
-        document.getElementById('data-budget-table').style.display = 'none';
-        return;
-    }
-
-    // ── Sort ──────────────────────────────────────────────────
-    function doSort(arr, sortCol) {
-        if (!sortCol) return arr;
-        return [...arr].sort((a, b) => {
-            if (sortCol === 'name')
-                return dataSort.dir * String(a.name||'').localeCompare(String(b.name||''));
-            if (sortCol === 'price') {
-                return dataSort.dir * ((parseFloat(a.price)||0) - (parseFloat(b.price)||0));
-            }
-            // race_pts key e.g. "R1"
-            if (sortCol.match(/^R\d+$/)) {
-                const av = parseFloat((a.race_pts||{})[sortCol]||'') || -Infinity;
-                const bv = parseFloat((b.race_pts||{})[sortCol]||'') || -Infinity;
-                return dataSort.dir * (av - bv);
-            }
-            // req_pts key e.g. "-0.3"
-            const av = parseFloat(String(((a.req_pts||{})[sortCol])||'').replace(/[^\d.\-]/g,''));
-            const bv = parseFloat(String(((b.req_pts||{})[sortCol])||'').replace(/[^\d.\-]/g,''));
-            return dataSort.dir * ((isNaN(av)?Infinity:av) - (isNaN(bv)?Infinity:bv));
-        });
-    }
-
-    // ── Format actual race points ──────────────────────────────
-    const fmtPts = (val) => {
-        if (!val || val === '-' || val === '—')
-            return '<span style="color:var(--muted)">—</span>';
-        const n = parseFloat(val);
-        const c = n > 0 ? '#2ec4b6' : n < 0 ? '#ff4757' : 'var(--subtext)';
-        return '<span style="font-size:10px;color:' + c + '">' + val + '</span>';
-    };
-
-    // ── Format required-points cell ───────────────────────────
-    // isNeg = true for drop cols (-0.3/-0.1), false for rise cols (+0.1/+0.3)
-    const fmtReq = (val, isNeg) => {
-        if (!val || val === '-' || val === '—')
-            return '<span style="color:var(--muted)">—</span>';
-        const s   = String(val).trim();
-        const n   = parseFloat(s.replace(/[^\d.\-]/g, ''));
-        let bg = 'transparent', fg = '#cccccc';
-        if (isNeg) {
-            if      (n <= -20) { bg='#7b0000'; fg='#ff9999'; }
-            else if (n <= -10) { bg='#5a2000'; fg='#ffbb88'; }
-            else if (n <=   0) { bg='#1a5a1a'; fg='#aaffaa'; }
-            else if (n <=  15) { bg='#2a6a2a'; fg='#88ff88'; }
-            else               { bg='#3a3a00'; fg='#ffff88'; }
-        } else {
-            if      (n <=  0)  { bg='#1a5a1a'; fg='#aaffaa'; }
-            else if (n <= 10)  { bg='#1a5a1a'; fg='#aaffaa'; }
-            else if (n <= 25)  { bg='#4a4a00'; fg='#ffff88'; }
-            else if (n <= 45)  { bg='#5a2a00'; fg='#ffcc88'; }
-            else               { bg='#7b0000'; fg='#ffaaaa'; }
-        }
-        return '<div style="text-align:center;background:' + bg
-             + ';border-radius:3px;padding:2px 5px;font-size:10px;font-weight:bold;color:' + fg + '">'
-             + s + '</div>';
-    };
-
-    const TAG_COLORS = {
-        'MER':'#00d2be','FER':'#e8002d','RED':'#3671c6','MCL':'#ff8000',
-        'AMR':'#358c75','ALP':'#0093cc','WIL':'#005aff','HAA':'#888888',
-        'AUD':'#52e252','VRB':'#6692ff','CAD':'#cc0000','AST':'#358c75',
-        'RUS':'#00d2be','ANT':'#00d2be','LEC':'#e8002d','HAM':'#e8002d',
-        'VER':'#3671c6','NOR':'#ff8000','PIA':'#ff8000','ALO':'#358c75',
-        'STR':'#358c75','GAS':'#0093cc','COL':'#0093cc','SAI':'#005aff',
-        'ALB':'#005aff','BEA':'#888888','OCO':'#888888','HUL':'#52e252',
-        'BOR':'#52e252','LAW':'#6692ff','LIN':'#6692ff','BOT':'#cc0000',
-        'HAD':'#cc0000','PER':'#cc0000',
-    };
-
-    // ── Build one tier table — fully dynamic columns ───────────
-    function buildTierTable(tierEntries) {
-        if (!tierEntries.length) return '';
-
-        const sample = tierEntries[0];
-        const tierLabel = sample.tier_label || '';
-        const isA       = sample.tier === 'A';
-        const accent    = isA ? '#f4a100' : '#3a86ff';
-        const nameLabel = dataMode === 'drivers' ? 'DR' : 'CR';
-
-        // Race columns from first entry (e.g. ["R0","R1","R2"])
-        const raceCols = Object.keys(sample.race_pts || {}).sort((a,b) => {
-            return parseInt(a.slice(1)) - parseInt(b.slice(1));
-        });
-
-        // Price-change columns in order (e.g. ["-0.3","-0.1","+0.1","+0.3"])
-        const pcLabels = sample.price_changes || Object.keys(sample.req_pts || {});
-
-        const ac = (col) => dataSort.col === col ? '#3a86ff' : 'var(--muted)';
-
-        // ── Header Row 1: Tier label | R cols group | price-change groups ──
-        const nRace = raceCols.length;
-        const nDrop = pcLabels.filter(p => p.startsWith('-')).length;
-        const nRise = pcLabels.filter(p => p.startsWith('+')).length;
-
-        let hdr1 = '<tr style="background:var(--card2);border-top:2px solid ' + accent + '88">'
-            + '<td colspan="2" style="padding:5px 8px;font-size:8px;font-weight:bold;color:' + accent
-            + ';text-transform:uppercase;letter-spacing:.06em">' + tierLabel + '</td>';
-
-        // R0/R1/R2… group headers
-        if (nRace > 0) {
-            hdr1 += '<th colspan="' + nRace + '" class="p-1 text-center text-[8px]" style="color:var(--muted)">Pts</th>';
-        }
-        // Drop group
-        if (nDrop > 0) {
-            hdr1 += '<th colspan="' + nDrop + '" class="p-1 text-center text-[8px] font-bold"'
-                 +  ' style="background:rgba(120,10,10,.5);color:#ff8888;border-radius:3px 3px 0 0">'
-                 +  pcLabels.filter(p=>p.startsWith('-')).join(' &nbsp; ') + '</th>';
-        }
-        // Rise group
-        if (nRise > 0) {
-            hdr1 += '<th colspan="' + nRise + '" class="p-1 text-center text-[8px] font-bold"'
-                 +  ' style="background:rgba(10,120,50,.5);color:#aaffcc;border-radius:3px 3px 0 0">'
-                 +  pcLabels.filter(p=>p.startsWith('+')).join(' &nbsp; ') + '</th>';
-        }
-        hdr1 += '</tr>';
-
-        // ── Header Row 2: DR/CR | $ | R0 | R1 | … | -0.3 | -0.1 | +0.1 | +0.3 | … ──
-        let hdr2 = '<tr style="background:var(--card2);border-bottom:2px solid var(--border)">'
-            + '<th class="p-2 pl-3 text-left text-[8px] font-normal cursor-pointer select-none"'
-            +   ' style="color:' + ac('name') + '" onclick="sortDataCol(\'name\')">' + nameLabel + ' ↕</th>'
-            + '<th class="p-2 text-center text-[8px] font-normal cursor-pointer select-none"'
-            +   ' style="color:' + ac('price') + '" onclick="sortDataCol(\'price\')">$ ↕</th>';
-
-        raceCols.forEach(rk => {
-            hdr2 += '<th class="p-1 text-center text-[8px] font-normal cursor-pointer select-none"'
-                 +  ' style="color:' + ac(rk) + '" onclick="sortDataCol(\'' + rk + '\')">' + rk + ' ↕</th>';
-        });
-        pcLabels.forEach(pk => {
-            const isNeg = pk.startsWith('-');
-            const pcol  = isNeg ? '#ff9999' : '#aaffcc';
-            hdr2 += '<th class="p-1 text-center text-[8px] font-normal cursor-pointer select-none"'
-                 +  ' style="color:' + (dataSort.col===pk ? '#3a86ff' : pcol) + '"'
-                 +  ' onclick="sortDataCol(\'' + pk.replace(/'/g,"\\'") + '\')">'
-                 +  'Pts ↕</th>';
-        });
-        hdr2 += '</tr>';
-
-        // ── Data rows ──────────────────────────────────────────
-        const sorted = doSort(tierEntries, dataSort.col);
-        const dataRows = sorted.map(d => {
-            const tag = d.name || '—';
-            const tc  = TAG_COLORS[tag] || '#9090b8';
-            let row = '<tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)"'
-                    + ' onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'\'">'
-                    + '<td class="p-2 pl-3 whitespace-nowrap">'
-                    +   '<span style="background:' + tc + '33;color:' + tc + ';font-size:9px;font-weight:bold;'
-                    +   'padding:2px 7px;border-radius:5px;font-family:\'Share Tech Mono\',monospace">' + tag + '</span>'
-                    + '</td>'
-                    + '<td class="p-2 text-center font-mono text-[10px] whitespace-nowrap" style="color:var(--subtext)">'
-                    +   (d.price ? d.price : '<span style="color:var(--muted)">—</span>')
-                    + '</td>';
-
-            // Race pts columns
-            raceCols.forEach(rk => {
-                row += '<td class="p-1 text-center">' + fmtPts((d.race_pts||{})[rk]) + '</td>';
-            });
-            // Required pts columns
-            pcLabels.forEach(pk => {
-                const isNeg = pk.startsWith('-');
-                row += '<td class="p-1 text-center">' + fmtReq((d.req_pts||{})[pk], isNeg) + '</td>';
-            });
-
-            row += '</tr>';
-            return row;
-        }).join('');
-
-        const totalCols = 2 + nRace + pcLabels.length;
-        return '<table class="w-full mb-4" style="min-width:380px;border-collapse:collapse;'
-             + 'border:1px solid var(--border);border-radius:10px;overflow:hidden">'
-             + '<thead>' + hdr1 + hdr2 + '</thead>'
-             + '<tbody>' + dataRows + '</tbody>'
-             + '</table>';
-    }
-
-    // ── Split tiers ────────────────────────────────────────────
-    const tierA = raw.filter(d => d.tier === 'A' || (d.tier == null && parseFloat(d.price) >= 18.5));
-    const tierB = raw.filter(d => d.tier === 'B' || (d.tier == null && parseFloat(d.price) <  18.5));
-
-    document.getElementById('data-budget-table').innerHTML =
-        '<div style="overflow-x:auto">'
-        + buildTierTable(tierA)
-        + buildTierTable(tierB)
-        + '</div>';
-
-    document.getElementById('data-budget-error').style.display = 'none';
-    document.getElementById('data-budget-table').style.display = '';
-}
-
-// Stubs — juice/market removed
-function renderJuice() {}
-function renderMarket() {}
-function setRawsTab() {}
-function sortRaws() {}
-function renderRaws() {}
-
-// ═══════════════════════════════════════════════════════════════════
-// SCHEDULE PAGE
-// ═══════════════════════════════════════════════════════════════════
-
-// Each race has explicit UTC session times — no generic templates.
-// Sessions: {key, label, y, mo (0-indexed), d, h, m} in UTC.
-// Sydney DST: AEDT (UTC+11) first Sun Oct → first Sun Apr
-//             AEST (UTC+10) first Sun Apr → first Sun Oct
-// 2026 transitions: AEDT ends Apr 5, AEDT starts Oct 4
-
-const F1_SCHEDULE = [
-  { round:1,  gp:'Australian Grand Prix',      location:'Melbourne',         circuit:'Albert Park Circuit',             type:'traditional', date:'Mar 08', full_dates:'Mar 06-08',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:2, d:6,  h:1,  m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:2, d:6,  h:5,  m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:2, d:7,  h:1,  m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:2, d:7,  h:5,  m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:2, d:8,  h:4,  m:0 },
-    ]},
-  { round:2,  gp:'Chinese Grand Prix',         location:'Shanghai',          circuit:'Shanghai International Circuit',  type:'sprint',      date:'Mar 15', full_dates:'Mar 13-15',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:2, d:13, h:3,  m:30},
-      {key:'sq',    label:'Sprint Qualifying',  y:2026,mo:2, d:13, h:7,  m:30},
-      {key:'sprint',label:'Sprint Race',        y:2026,mo:2, d:14, h:4,  m:0 },
-      {key:'quali', label:'Qualifying',         y:2026,mo:2, d:14, h:8,  m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:2, d:15, h:7,  m:0 },
-    ]},
-  { round:3,  gp:'Japanese Grand Prix',        location:'Suzuka',            circuit:'Suzuka Circuit',                  type:'traditional', date:'Mar 29', full_dates:'Mar 27-29',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:2, d:27, h:2,  m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:2, d:27, h:6,  m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:2, d:28, h:2,  m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:2, d:28, h:6,  m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:2, d:29, h:5,  m:0 },
-    ]},
-  { round:4,  gp:'Bahrain Grand Prix',         location:'Sakhir',            circuit:'Bahrain International Circuit',   type:'traditional', date:'Apr 12', full_dates:'Apr 10-12',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:3, d:10, h:12, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:3, d:10, h:16, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:3, d:11, h:12, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:3, d:11, h:16, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:3, d:12, h:15, m:0 },
-    ]},
-  { round:5,  gp:'Saudi Arabian Grand Prix',   location:'Jeddah',            circuit:'Jeddah Corniche Circuit',         type:'traditional', date:'Apr 19', full_dates:'Apr 17-19',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:3, d:17, h:14, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:3, d:17, h:18, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:3, d:18, h:14, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:3, d:18, h:18, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:3, d:19, h:17, m:0 },
-    ]},
-  { round:6,  gp:'Miami Grand Prix',           location:'Miami',             circuit:'Miami International Autodrome',   type:'sprint',      date:'May 03', full_dates:'May 01-03',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:4, d:1,  h:16, m:30},
-      {key:'sq',    label:'Sprint Qualifying',  y:2026,mo:4, d:1,  h:20, m:30},
-      {key:'sprint',label:'Sprint Race',        y:2026,mo:4, d:2,  h:15, m:0 },
-      {key:'quali', label:'Qualifying',         y:2026,mo:4, d:2,  h:20, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:4, d:3,  h:19, m:30},
-    ]},
-  { round:7,  gp:'Canadian Grand Prix',        location:'Montreal',          circuit:'Circuit Gilles Villeneuve',       type:'sprint',      date:'May 24', full_dates:'May 22-24',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:4, d:22, h:17, m:30},
-      {key:'sq',    label:'Sprint Qualifying',  y:2026,mo:4, d:22, h:21, m:30},
-      {key:'sprint',label:'Sprint Race',        y:2026,mo:4, d:23, h:16, m:0 },
-      {key:'quali', label:'Qualifying',         y:2026,mo:4, d:23, h:20, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:4, d:24, h:18, m:0 },
-    ]},
-  { round:8,  gp:'Monaco Grand Prix',          location:'Monte Carlo',       circuit:'Circuit de Monaco',               type:'traditional', date:'Jun 07', full_dates:'Jun 05-07',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:5, d:5,  h:10, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:5, d:5,  h:14, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:5, d:6,  h:9,  m:0 },
-      {key:'quali', label:'Qualifying',         y:2026,mo:5, d:6,  h:13, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:5, d:7,  h:13, m:0 },
-    ]},
-  { round:9,  gp:'Barcelona-Catalunya GP',     location:'Barcelona',         circuit:'Circuit de Barcelona-Catalunya',  type:'traditional', date:'Jun 14', full_dates:'Jun 12-14',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:5, d:12, h:11, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:5, d:12, h:15, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:5, d:13, h:10, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:5, d:13, h:14, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:5, d:14, h:13, m:0 },
-    ]},
-  { round:10, gp:'Austrian Grand Prix',        location:'Spielberg',         circuit:'Red Bull Ring',                   type:'traditional', date:'Jun 28', full_dates:'Jun 26-28',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:5, d:26, h:11, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:5, d:26, h:15, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:5, d:27, h:10, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:5, d:27, h:14, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:5, d:28, h:13, m:0 },
-    ]},
-  { round:11, gp:'British Grand Prix',         location:'Silverstone',       circuit:'Silverstone Circuit',             type:'sprint',      date:'Jul 05', full_dates:'Jul 03-05',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:6, d:3,  h:11, m:30},
-      {key:'sq',    label:'Sprint Qualifying',  y:2026,mo:6, d:3,  h:15, m:30},
-      {key:'sprint',label:'Sprint Race',        y:2026,mo:6, d:4,  h:11, m:0 },
-      {key:'quali', label:'Qualifying',         y:2026,mo:6, d:4,  h:15, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:6, d:5,  h:14, m:0 },
-    ]},
-  { round:12, gp:'Belgian Grand Prix',         location:'Spa-Francorchamps', circuit:'Circuit de Spa-Francorchamps',    type:'traditional', date:'Jul 19', full_dates:'Jul 17-19',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:6, d:17, h:11, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:6, d:17, h:15, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:6, d:18, h:10, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:6, d:18, h:14, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:6, d:19, h:13, m:0 },
-    ]},
-  { round:13, gp:'Hungarian Grand Prix',       location:'Budapest',          circuit:'Hungaroring',                     type:'traditional', date:'Jul 26', full_dates:'Jul 24-26',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:6, d:24, h:11, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:6, d:24, h:15, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:6, d:25, h:10, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:6, d:25, h:14, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:6, d:26, h:13, m:0 },
-    ]},
-  { round:14, gp:'Dutch Grand Prix',           location:'Zandvoort',         circuit:'Circuit Zandvoort',               type:'sprint',      date:'Aug 23', full_dates:'Aug 21-23',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:7, d:21, h:11, m:30},
-      {key:'sq',    label:'Sprint Qualifying',  y:2026,mo:7, d:21, h:15, m:30},
-      {key:'sprint',label:'Sprint Race',        y:2026,mo:7, d:22, h:11, m:0 },
-      {key:'quali', label:'Qualifying',         y:2026,mo:7, d:22, h:15, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:7, d:23, h:13, m:0 },
-    ]},
-  { round:15, gp:'Italian Grand Prix',         location:'Monza',             circuit:'Autodromo Nazionale Monza',       type:'traditional', date:'Sep 06', full_dates:'Sep 04-06',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:8, d:4,  h:11, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:8, d:4,  h:15, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:8, d:5,  h:10, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:8, d:5,  h:14, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:8, d:6,  h:13, m:0 },
-    ]},
-  { round:16, gp:'Spanish Grand Prix',         location:'Madrid',            circuit:'Madrid Street Circuit',           type:'traditional', date:'Sep 13', full_dates:'Sep 11-13',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:8, d:11, h:11, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:8, d:11, h:15, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:8, d:12, h:10, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:8, d:12, h:14, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:8, d:13, h:13, m:0 },
-    ]},
-  { round:17, gp:'Azerbaijan Grand Prix',      location:'Baku',              circuit:'Baku City Circuit',               type:'traditional', date:'Sep 26', full_dates:'Sep 24-26',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:8, d:24, h:9,  m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:8, d:24, h:13, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:8, d:25, h:9,  m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:8, d:25, h:13, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:8, d:26, h:11, m:0 },
-    ]},
-  { round:18, gp:'Singapore Grand Prix',       location:'Marina Bay',        circuit:'Marina Bay Street Circuit',       type:'sprint',      date:'Oct 11', full_dates:'Oct 09-11',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:9, d:9,  h:9,  m:30},
-      {key:'sq',    label:'Sprint Qualifying',  y:2026,mo:9, d:9,  h:13, m:30},
-      {key:'sprint',label:'Sprint Race',        y:2026,mo:9, d:10, h:9,  m:0 },
-      {key:'quali', label:'Qualifying',         y:2026,mo:9, d:10, h:13, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:9, d:11, h:12, m:0 },
-    ]},
-  { round:19, gp:'United States Grand Prix',   location:'Austin',            circuit:'Circuit of the Americas',         type:'traditional', date:'Oct 25', full_dates:'Oct 23-25',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:9, d:23, h:18, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:9, d:23, h:22, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:9, d:24, h:18, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:9, d:24, h:22, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:9, d:25, h:20, m:0 },
-    ]},
-  { round:20, gp:'Mexico City Grand Prix',     location:'Mexico City',       circuit:'Autódromo Hermanos Rodríguez',    type:'traditional', date:'Nov 01', full_dates:'Oct 30-Nov 01',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:9, d:30, h:19, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:9, d:30, h:23, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:9, d:31, h:19, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:9, d:31, h:23, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:10,d:1,  h:20, m:0 },
-    ]},
-  { round:21, gp:'São Paulo Grand Prix',       location:'São Paulo',         circuit:'Autódromo José Carlos Pace',      type:'traditional', date:'Nov 08', full_dates:'Nov 06-08',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:10,d:6,  h:14, m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:10,d:6,  h:18, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:10,d:7,  h:14, m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:10,d:7,  h:18, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:10,d:8,  h:17, m:0 },
-    ]},
-  { round:22, gp:'Las Vegas Grand Prix',       location:'Las Vegas',         circuit:'Las Vegas Strip Circuit',         type:'traditional', date:'Nov 21', full_dates:'Nov 19-21',
-    sessions:[
-      // Las Vegas runs Thu-Sat nights local (PST = UTC-8)
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:10,d:20, h:2,  m:30},  // Thu 18:30 PST
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:10,d:20, h:6,  m:30},  // Thu 22:30 PST
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:10,d:21, h:2,  m:0 },  // Fri 18:00 PST
-      {key:'quali', label:'Qualifying',         y:2026,mo:10,d:21, h:6,  m:0 },  // Fri 22:00 PST
-      {key:'race',  label:'Race',               y:2026,mo:10,d:22, h:6,  m:0 },  // Sat 22:00 PST
-    ]},
-  { round:23, gp:'Qatar Grand Prix',           location:'Lusail',            circuit:'Lusail International Circuit',    type:'sprint',      date:'Nov 29', full_dates:'Nov 27-29',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:10,d:27, h:13, m:30},
-      {key:'sq',    label:'Sprint Qualifying',  y:2026,mo:10,d:27, h:17, m:30},
-      {key:'sprint',label:'Sprint Race',        y:2026,mo:10,d:28, h:13, m:0 },
-      {key:'quali', label:'Qualifying',         y:2026,mo:10,d:28, h:17, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:10,d:29, h:15, m:0 },
-    ]},
-  { round:24, gp:'Abu Dhabi Grand Prix',       location:'Yas Island',        circuit:'Yas Marina Circuit',              type:'traditional', date:'Dec 06', full_dates:'Dec 04-06',
-    sessions:[
-      {key:'fp1',   label:'Free Practice 1',   y:2026,mo:11,d:4,  h:9,  m:30},
-      {key:'fp2',   label:'Free Practice 2',   y:2026,mo:11,d:4,  h:13, m:0 },
-      {key:'fp3',   label:'Free Practice 3',   y:2026,mo:11,d:5,  h:9,  m:30},
-      {key:'quali', label:'Qualifying',         y:2026,mo:11,d:5,  h:13, m:0 },
-      {key:'race',  label:'Race',               y:2026,mo:11,d:6,  h:13, m:0 },
-    ]},
-];
-
-const GP_FLAGS = {
-    'Australian Grand Prix':'🇦🇺','Chinese Grand Prix':'🇨🇳','Japanese Grand Prix':'🇯🇵',
-    'Bahrain Grand Prix':'🇧🇭','Saudi Arabian Grand Prix':'🇸🇦','Miami Grand Prix':'🇺🇸',
-    'Canadian Grand Prix':'🇨🇦','Monaco Grand Prix':'🇲🇨','Barcelona-Catalunya GP':'🇪🇸',
-    'Austrian Grand Prix':'🇦🇹','British Grand Prix':'🇬🇧','Belgian Grand Prix':'🇧🇪',
-    'Hungarian Grand Prix':'🇭🇺','Dutch Grand Prix':'🇳🇱','Italian Grand Prix':'🇮🇹',
-    'Spanish Grand Prix':'🇪🇸','Azerbaijan Grand Prix':'🇦🇿','Singapore Grand Prix':'🇸🇬',
-    'United States Grand Prix':'🇺🇸','Mexico City Grand Prix':'🇲🇽','São Paulo Grand Prix':'🇧🇷',
-    'Las Vegas Grand Prix':'🇺🇸','Qatar Grand Prix':'🇶🇦','Abu Dhabi Grand Prix':'🇦🇪',
-};
-
-// Sydney timezone: AEDT (UTC+11) first Sun Oct → first Sun Apr
-//                  AEST (UTC+10) first Sun Apr → first Sun Oct
-// Computes the correct offset for any UTC date
-function sydneyOffsetHours(utcDate) {
-    const y = utcDate.getUTCFullYear();
-    // First Sunday of April (AEDT ends — clocks back to AEST)
-    const apr1    = new Date(Date.UTC(y, 3, 1));
-    const aprSun  = new Date(Date.UTC(y, 3, 1 + (7 - apr1.getUTCDay()) % 7, 2, 0, 0)); // 02:00 UTC ≈ 13:00 AEDT transition
-    // First Sunday of October (AEST ends — clocks forward to AEDT)
-    const oct1    = new Date(Date.UTC(y, 9, 1));
-    const octSun  = new Date(Date.UTC(y, 9, 1 + (7 - oct1.getUTCDay()) % 7, 16, 0, 0)); // 16:00 UTC ≈ 02:00 AEDT next day
-    if (utcDate >= aprSun && utcDate < octSun) return 10; // AEST
-    return 11; // AEDT
-}
-
-function utcToSydney(utcDate) {
-    const off = sydneyOffsetHours(utcDate);
-    return new Date(utcDate.getTime() + off * 3600000);
-}
-
-function nowSydney() {
-    return utcToSydney(new Date());
-}
-
-// Build sessions for a round from its hardcoded UTC session data
-function buildSessions(race) {
-    return race.sessions.map(s => {
-        const utcDate = new Date(Date.UTC(s.y, s.mo, s.d, s.h, s.m, 0));
-        return {
-            key:     s.key,
-            label:   s.label,
-            utcDate,
-            sydDate: utcToSydney(utcDate),
-        };
-    });
-}
-
-// Format sydDate as "Sat 7 Mar, 3:30 PM"
-function fmtSyd(d) {
-    const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const months= ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    let h = d.getUTCHours(), m = d.getUTCMinutes();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    const mm = String(m).padStart(2,'0');
-    return `${days[d.getUTCDay()]} ${d.getUTCDate()} ${months[d.getUTCMonth()]}, ${h}:${mm} ${ampm}`;
-}
-
-function fmtCountdown(ms) {
-    if (ms <= 0) return '00:00:00';
-    const s  = Math.floor(ms / 1000);
-    const dd = Math.floor(s / 86400);
-    const hh = Math.floor((s % 86400) / 3600);
-    const mm = Math.floor((s % 3600) / 60);
-    const ss = s % 60;
-    if (dd > 0) return `${dd}d ${String(hh).padStart(2,'0')}h ${String(mm).padStart(2,'0')}m`;
-    return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
-}
-
-let _schedCountdownInterval = null;
-
-function populateScheduleDropdown() {
-    const sel = document.getElementById('sched-round-select');
-    if (!sel) return;
-    const nowUtc = new Date();
-    // Find next or current round
-    let defaultRound = F1_SCHEDULE[0].round;
-    for (const r of F1_SCHEDULE) {
-        const sessions = buildSessions(r);
-        const lastSession = sessions[sessions.length - 1];
-        if (lastSession.utcDate >= nowUtc) { defaultRound = r.round; break; }
-    }
-    sel.innerHTML = F1_SCHEDULE.map(r => {
-        const flag = GP_FLAGS[r.gp] || '🏁';
-        return `<option value="${r.round}" ${r.round === defaultRound ? 'selected' : ''}>R${String(r.round).padStart(2,'0')} · ${flag} ${r.gp} · ${r.date}</option>`;
-    }).join('');
-    renderScheduleRound();
-    startCountdown();
-}
-
-function startCountdown() {
-    if (_schedCountdownInterval) clearInterval(_schedCountdownInterval);
-    _schedCountdownInterval = setInterval(updateCountdown, 1000);
-    updateCountdown();
-}
-
-function updateCountdown() {
-    const nowUtc = new Date();
-    // Find first future session across all rounds
-    let nextSession = null, nextRace = null;
-    outer: for (const r of F1_SCHEDULE) {
-        for (const s of buildSessions(r)) {
-            if (s.utcDate > nowUtc) { nextSession = s; nextRace = r; break outer; }
-        }
-    }
-    const evEl   = document.getElementById('sched-countdown-event');
-    const tmEl   = document.getElementById('sched-countdown-timer');
-    const whEl   = document.getElementById('sched-countdown-when');
-    if (!nextSession) {
-        if (evEl) evEl.textContent  = 'Season Complete 🏁';
-        if (tmEl) tmEl.textContent  = '—';
-        if (whEl) whEl.textContent  = '';
-        return;
-    }
-    const flag = GP_FLAGS[nextRace.gp] || '🏁';
-    if (evEl) evEl.textContent  = `${flag} ${nextRace.gp} · ${nextSession.label}`;
-    if (tmEl) tmEl.textContent  = fmtCountdown(nextSession.utcDate - nowUtc);
-    if (whEl) whEl.textContent  = fmtSyd(nextSession.sydDate);
-}
-
-function renderScheduleRound() {
-    const roundNum = parseInt(document.getElementById('sched-round-select').value);
-    const race = F1_SCHEDULE.find(r => r.round === roundNum);
-    if (!race) return;
-    const sessions  = buildSessions(race);
-    const nowUtc    = new Date();
-    const flag      = GP_FLAGS[race.gp] || '🏁';
-
-    // Find the first future session index
-    let nextIdx = sessions.findIndex(s => s.utcDate > nowUtc);
-
-    const rows = sessions.map((s, i) => {
-        const isPast     = s.utcDate <= nowUtc;
-        const isNext     = i === nextIdx;
-        const isUpcoming = !isPast && i !== nextIdx;
-
-        let statusBg, statusColor, statusTag;
-        if (isPast) {
-            statusBg    = 'rgba(255,71,87,.10)';
-            statusColor = '#ff4757';
-            statusTag   = 'FINISHED';
-        } else if (isNext) {
-            statusBg    = 'rgba(46,196,182,.15)';
-            statusColor = '#2ec4b6';
-            statusTag   = 'UPCOMING NEXT ▶';
-        } else {
-            statusBg    = 'rgba(46,196,182,.06)';
-            statusColor = '#74d9d0';
-            statusTag   = 'UPCOMING';
-        }
-
-        const rowBg = isNext ? 'rgba(46,196,182,.04)' : isPast ? 'rgba(255,71,87,.03)' : '';
-
-        return `<tr style="border-bottom:1px solid var(--border);background:${rowBg}">
-            <td class="p-3">
-                <div class="font-bold text-[11px]" style="color:var(--text)">${s.label}</div>
-                <div class="text-[9px] mt-0.5" style="color:var(--muted)">${fmtSyd(s.sydDate)} AEDT/AEST</div>
-            </td>
-            <td class="p-3 text-right" style="vertical-align:middle;">
-                <span style="background:${statusBg};color:${statusColor};font-size:7px;font-weight:bold;padding:2px 6px;border-radius:5px;letter-spacing:.05em;white-space:nowrap;">${statusTag}</span>
-            </td>
-        </tr>`;
-    }).join('');
-
-    document.getElementById('sched-session-table').innerHTML = `
-    <div style="padding:12px 14px 8px;border-bottom:1px solid var(--border);">
-        <div class="fun text-base" style="color:var(--text)">${flag} ${race.gp}</div>
-        <div class="text-[9px] mt-0.5" style="color:var(--subtext)">${race.circuit} · ${race.full_dates} · ${race.type === 'sprint' ? '⚡ Sprint Weekend' : '🏁 Traditional Weekend'}</div>
-    </div>
-    <table class="w-full"><tbody>${rows}</tbody></table>`;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// DATA PAGE — Fantasy Data panel (from f1_fantasy.json)
-// ═══════════════════════════════════════════════════════════════════
-let F1_FANTASY    = null;   // loaded from f1_fantasy.json
-let fantasyMode   = 'drivers';
-let fantasySort   = { col:'total_points', dir:-1 };
+let fantasyMode = 'drivers';
+let fantasySort = { col:'total_points', dir:-1 };
 
 function setFantasyTab(mode) {
     fantasyMode = mode;
@@ -1351,54 +775,34 @@ function sortFantasyCol(col) {
     renderFantasyTable();
 }
 
-async function loadF1Fantasy() {
-    try {
-        const res = await fetch('./f1_fantasy.json', { cache:'no-cache' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        F1_FANTASY = await res.json();
-        populateFantasyGameweeks();
-        renderFantasyTable();
-        document.getElementById('fantasy-error').style.display = 'none';
-    } catch (e) {
-        console.warn('f1_fantasy.json not found:', e);
-        document.getElementById('fantasy-error').style.display = '';
-        document.getElementById('fantasy-table').innerHTML = '';
-    }
-}
-
-function populateFantasyGameweeks() {
+function populateFantasyRounds() {
     if (!F1_FANTASY) return;
-    const sel = document.getElementById('fantasy-gw-select');
+    const sel = document.getElementById('fantasy-round-select');
     if (!sel) return;
     const gws = F1_FANTASY.gameweeks || [];
     sel.innerHTML = `<option value="overall">📊 Overall (Season)</option>` +
         [...gws].reverse().map(gw =>
-            `<option value="${gw.round}">${GP_FLAGS[gw.gp]||'🏁'} R${String(gw.round).padStart(2,'0')} · ${gw.gp||gw.label||''}</option>`
+            `<option value="${gw.round}">${GP_FLAGS[gw.gp]||'🏁'} R${String(gw.round).padStart(2,'0')} · ${gw.gp||''}</option>`
         ).join('');
-    // Default to latest
-    if (gws.length) sel.value = gws[gws.length - 1].round;
 }
 
 function renderFantasyTable() {
     if (!F1_FANTASY) return;
-    const gwSel = document.getElementById('fantasy-gw-select');
-    const gwVal = gwSel ? gwSel.value : 'overall';
-
-    // Resolve data for selected gameweek
+    const gwVal = document.getElementById('fantasy-round-select')?.value || 'overall';
     let drivers = [], constructors = [];
     if (gwVal === 'overall') {
         drivers      = F1_FANTASY.overall?.drivers      || [];
         constructors = F1_FANTASY.overall?.constructors || [];
         document.getElementById('fantasy-updated-chip').textContent = F1_FANTASY.last_updated?.split(' ')[0] || '';
     } else {
-        const gw = (F1_FANTASY.gameweeks || []).find(g => String(g.round) === String(gwVal));
+        const gw = (F1_FANTASY.gameweeks||[]).find(g => String(g.round)===String(gwVal));
         drivers      = gw?.drivers      || [];
         constructors = gw?.constructors || [];
         document.getElementById('fantasy-updated-chip').textContent = gw?.date || '';
     }
 
-    const raw = fantasyMode === 'drivers' ? drivers : constructors;
-    const sorted = [...raw].sort((a, b) => {
+    const raw    = fantasyMode === 'drivers' ? drivers : constructors;
+    const sorted = [...raw].sort((a,b) => {
         const av = a[fantasySort.col] ?? -Infinity;
         const bv = b[fantasySort.col] ?? -Infinity;
         return fantasySort.dir * (bv - av);
@@ -1412,17 +816,11 @@ function renderFantasyTable() {
                     ${label}<span style="opacity:.7;margin-left:2px">${arrow}</span></th>`;
     };
 
-    const TEAM_TAG_COLORS = {
-        'MER':'#00d2be','FER':'#e8002d','RED':'#3671c6','MCL':'#ff8000',
-        'AMR':'#358c75','ALP':'#0093cc','WIL':'#005aff','HAA':'#888888',
-        'AUD':'#52e252','VRB':'#6692ff','CAD':'#cc0000',
-    };
-
     const rows = sorted.map((d, i) => {
-        const tag   = d.short_name || d.name || '—';
-        const tc    = TEAM_TAG_COLORS[d.team_tag || tag] || '#9090b8';
-        const pts   = d.total_points ?? d.points ?? '—';
-        const price = d.price != null ? `$${d.price}M` : '—';
+        const tag    = d.short_name || d.name || '—';
+        const tc     = TEAM_TAG_COLORS[d.team_tag || tag] || '#9090b8';
+        const pts    = gwVal === 'overall' ? (d.total_points ?? '—') : (d.points_this_gw ?? d.total_points ?? '—');
+        const price  = d.price != null ? `$${d.price}M` : '—';
         const ptsNum = typeof pts === 'number' ? pts : 0;
         const rankCol = i===0?'#f4a100':i===1?'#9a9aaa':i===2?'#cd7f32':'var(--muted)';
         return `<tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)"
@@ -1430,10 +828,10 @@ function renderFantasyTable() {
             <td class="p-2 text-center font-mono text-[9px] font-bold w-6" style="color:${rankCol}">${i+1}</td>
             <td class="p-3">
                 <div class="flex items-center gap-2">
-                    <span style="background:${tc}22;color:${tc};font-size:9px;font-weight:bold;padding:2px 6px;border-radius:6px;font-family:'Share Tech Mono',monospace;">${tag}</span>
+                    <span style="background:${tc}22;color:${tc};font-size:9px;font-weight:bold;padding:2px 6px;border-radius:6px;">${tag}</span>
                     <span class="text-[10px]" style="color:var(--text)">${d.full_name || d.name || ''}</span>
                 </div>
-                ${fantasyMode==='drivers' && d.team ? `<div class="text-[8px] mt-0.5 ml-9" style="color:${tc}">${d.team}</div>` : ''}
+                ${fantasyMode==='drivers'&&d.team ? `<div class="text-[8px] mt-0.5 ml-9" style="color:${tc}">${d.team}</div>` : ''}
             </td>
             <td class="p-2 text-center font-mono text-[10px]" style="color:var(--subtext)">${price}</td>
             <td class="p-2 text-center font-mono text-[11px] font-bold" style="color:${ptsNum>0?'#2ec4b6':ptsNum<0?'#ff4757':'var(--subtext)'}">${pts}</td>
@@ -1455,72 +853,108 @@ function renderFantasyTable() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// DATA PAGE — League Teams panel (from f1_teams.json)
+// LEAGUE TEAMS (f1_teams.json) — overall summary or per-round picks
 // ═══════════════════════════════════════════════════════════════════
-let F1_TEAMS = null;  // loaded from f1_teams.json
-
-async function loadF1Teams() {
-    try {
-        const res = await fetch('./f1_teams.json', { cache:'no-cache' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        F1_TEAMS = await res.json();
-        populateTeamsDropdowns();
-        renderTeamsPanel();
-        document.getElementById('teams-error').style.display = 'none';
-    } catch (e) {
-        console.warn('f1_teams.json not found:', e);
-        document.getElementById('teams-error').style.display = '';
-        document.getElementById('teams-summary').innerHTML = '';
-        document.getElementById('teams-picks-table').innerHTML = '';
-    }
-}
-
 function populateTeamsDropdowns() {
     if (!F1_TEAMS) return;
 
+    // Round dropdown — overall + completed rounds with picks
+    const rSel = document.getElementById('teams-round-select');
+    const rounds = (F1_TEAMS.rounds||[]).filter(r => r.teams?.some(t => t.picks?.length > 0));
+    rSel.innerHTML = `<option value="overall">📊 Overall Standings</option>` +
+        [...rounds].reverse().map(r => {
+            const flag   = GP_FLAGS[r.gp] || '🏁';
+            const status = r.confirmed ? '✅' : '🔄';
+            return `<option value="${r.round}">${status} R${String(r.round).padStart(2,'0')} · ${flag} ${r.gp||r.label}</option>`;
+        }).join('');
+    if (rounds.length) rSel.value = rounds[rounds.length-1].round;
+
     // Player dropdown
     const pSel = document.getElementById('teams-player-select');
-    if (pSel) {
-        pSel.innerHTML = (F1_TEAMS.players || []).map(p =>
-            `<option value="${p.id}">${p.emoji||'👤'} ${p.name}</option>`
-        ).join('');
-    }
-
-    // Round dropdown — show completed rounds + current
-    const rSel = document.getElementById('teams-round-select');
-    if (!rSel) return;
-    const rounds = F1_TEAMS.rounds || [];
-    rSel.innerHTML = rounds.map(r => {
-        const flag = GP_FLAGS[r.gp] || '🏁';
-        const status = r.confirmed ? '✅' : '🔄';
-        return `<option value="${r.round}">${status} R${String(r.round).padStart(2,'0')} · ${flag} ${r.gp||r.label}</option>`;
+    pSel.innerHTML = (F1_TEAMS.players||[]).map(p => {
+        const pid = PLAYER_ID_MAP[p.id] || p.id;
+        const pc  = PLAYERS[pid] || { name:p.name, emoji:'👤' };
+        return `<option value="${p.id}">${pc.emoji} ${pc.name||p.name}</option>`;
     }).join('');
-    // Default to latest
-    if (rounds.length) rSel.value = rounds[rounds.length - 1].round;
 }
 
 function renderTeamsPanel() {
     if (!F1_TEAMS) return;
-    const playerId = document.getElementById('teams-player-select')?.value;
-    const roundNum = parseInt(document.getElementById('teams-round-select')?.value);
-    if (!playerId || !roundNum) return;
+    const roundVal = document.getElementById('teams-round-select')?.value;
+    const isOverall = roundVal === 'overall';
 
-    // Find the round record for this player
-    const roundData = (F1_TEAMS.rounds || []).find(r => r.round === roundNum);
-    if (!roundData) return;
-    const playerData = (roundData.teams || []).find(t => t.player_id === playerId);
-    if (!playerData) {
-        document.getElementById('teams-summary').innerHTML = `<div class="col-span-3 card2 p-3 text-center text-[10px]" style="color:var(--muted)">No team data recorded for this round.</div>`;
-        document.getElementById('teams-picks-table').innerHTML = '';
+    // Show/hide player select
+    document.getElementById('teams-player-wrap').style.display = isOverall ? 'none' : '';
+
+    if (isOverall) {
+        renderTeamsOverall();
+    } else {
+        renderTeamsRound(parseInt(roundVal));
+    }
+}
+
+function renderTeamsOverall() {
+    // Show all players ranked by cur_points from f1_teams.json
+    const players = [...(F1_TEAMS.players||[])].sort((a,b) => (b.cur_points||0) - (a.cur_points||0));
+
+    document.getElementById('teams-updated-chip').textContent = F1_TEAMS.last_updated?.split(' ')[0] || '';
+    document.getElementById('teams-summary').innerHTML = '';
+
+    if (!players.length) {
+        document.getElementById('teams-picks-table').innerHTML = '<div class="p-4 text-center text-[10px]" style="color:var(--muted)">No players found.</div>';
         return;
     }
 
-    // Summary row
-    const totalPts  = playerData.total_points ?? '—';
-    const budget    = playerData.budget_remaining != null ? `$${playerData.budget_remaining}M` : '—';
-    const teamVal   = playerData.team_value != null ? `$${playerData.team_value}M` : '—';
-    const confirmed = roundData.confirmed;
+    document.getElementById('teams-picks-table').innerHTML = `
+    <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border)">
+        <span class="text-[8px] uppercase tracking-widest" style="color:var(--muted)">Overall League Standings</span>
+    </div>
+    <table class="w-full">
+        <thead><tr class="border-b" style="background:var(--card2);border-color:var(--border)">
+            <th class="p-3 text-left text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Team</th>
+            <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Rank</th>
+            <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Points</th>
+        </tr></thead>
+        <tbody>
+        ${players.map((pl, i) => {
+            const pid = PLAYER_ID_MAP[pl.id] || pl.id;
+            const p   = PLAYERS[pid] || { name:pl.name, color:'#aaa', emoji:'👤' };
+            const mc  = i < 3 ? MEDAL_COLOR[i] : (p.color || '#aaa');
+            return `<tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)"
+                        onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
+                <td class="p-3">
+                    <div class="fun text-[14px]" style="color:${p.color}">${p.emoji} ${p.name}</div>
+                    <div class="text-[9px]" style="color:var(--muted)">Rank #${pl.cur_rank||i+1}</div>
+                </td>
+                <td class="p-2 text-center">
+                    ${i<3 ? `<span class="text-lg">${MEDAL[i]}</span>` : `<span class="fun text-sm" style="color:${mc}">${i+1}</span>`}
+                </td>
+                <td class="p-2 text-center font-mono text-lg font-bold" style="color:${mc}">${pl.cur_points||0}</td>
+            </tr>`;
+        }).join('')}
+        </tbody>
+    </table>`;
+}
+
+function renderTeamsRound(roundNum) {
+    const roundData = (F1_TEAMS.rounds||[]).find(r => r.round === roundNum);
+    if (!roundData) return;
+
+    const playerId = document.getElementById('teams-player-select')?.value;
+    if (!playerId) return;
+
+    const playerData = (roundData.teams||[]).find(t => t.player_id === playerId);
     document.getElementById('teams-updated-chip').textContent = roundData.confirmed ? 'Confirmed ✅' : 'Provisional 🔄';
+
+    if (!playerData || !playerData.picks?.length) {
+        document.getElementById('teams-summary').innerHTML = '';
+        document.getElementById('teams-picks-table').innerHTML = `<div class="p-4 text-center text-[10px]" style="color:var(--muted)">No team data for this round.</div>`;
+        return;
+    }
+
+    const totalPts = playerData.total_points ?? '—';
+    const budget   = playerData.budget_remaining != null ? `$${playerData.budget_remaining}M` : '—';
+    const teamVal  = playerData.team_value != null ? `$${playerData.team_value}M` : '—';
 
     document.getElementById('teams-summary').innerHTML = `
         <div class="card p-3 text-center">
@@ -1536,81 +970,324 @@ function renderTeamsPanel() {
             <div class="fun text-sm" style="color:#f4a100">${budget}</div>
         </div>`;
 
-    // Picks table
     const picks = playerData.picks || [];
-    const TEAM_TAG_COLORS_T = {
-        'MER':'#00d2be','FER':'#e8002d','RED':'#3671c6','MCL':'#ff8000',
-        'AMR':'#358c75','ALP':'#0093cc','WIL':'#005aff','HAA':'#888888',
-        'AUD':'#52e252','VRB':'#6692ff','CAD':'#cc0000',
-    };
-
-    const rows = picks.map(p => {
-        const tc       = TEAM_TAG_COLORS_T[p.team_tag] || '#9090b8';
-        const pts      = p.points ?? '—';
-        const price    = p.price != null ? `$${p.price}M` : '—';
-        const priceChg = p.price_change;
-        const chgStr   = priceChg != null
-            ? `<span style="color:${priceChg>0?'#2ec4b6':priceChg<0?'#ff4757':'var(--muted)'};font-size:8px;margin-left:3px">${priceChg>0?'+':''}${priceChg.toFixed(2)}</span>`
-            : '';
-        const ptsNum   = typeof pts === 'number' ? pts : 0;
-        const isStar   = p.is_star;
+    const rows  = picks.map(p => {
+        const tc     = TEAM_TAG_COLORS[p.team_tag] || '#9090b8';
+        const pts    = p.points ?? '—';
+        const price  = p.price != null ? `$${p.price}M` : '—';
+        const ptsNum = typeof pts === 'number' ? pts : 0;
         return `<tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)"
                     onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
             <td class="p-3">
                 <div class="flex items-center gap-2">
-                    ${isStar ? '<span style="font-size:10px">⭐</span>' : '<span style="width:14px;display:inline-block"></span>'}
-                    <span style="background:${tc}22;color:${tc};font-size:9px;font-weight:bold;padding:2px 6px;border-radius:6px;font-family:\'Share Tech Mono\',monospace;">${p.short_name||p.name}</span>
+                    ${p.is_star ? '<span style="font-size:10px">⭐</span>' : '<span style="width:14px;display:inline-block"></span>'}
+                    <span style="background:${tc}22;color:${tc};font-size:9px;font-weight:bold;padding:2px 6px;border-radius:6px;">${p.short_name||p.name}</span>
                     <span class="text-[9px]" style="color:var(--subtext)">${p.type==='constructor'?'🏗️':'🧑‍✈️'}</span>
                 </div>
                 ${p.team ? `<div class="text-[8px] mt-0.5 ml-9" style="color:${tc}">${p.team}</div>` : ''}
             </td>
-            <td class="p-2 text-center font-mono text-[10px]" style="color:var(--subtext)">${price}${confirmed?chgStr:''}</td>
+            <td class="p-2 text-center font-mono text-[10px]" style="color:var(--subtext)">${price}</td>
             <td class="p-2 text-center font-mono text-[11px] font-bold" style="color:${ptsNum>0?'#2ec4b6':ptsNum<0?'#ff4757':'var(--subtext)'}">${pts}</td>
         </tr>`;
     }).join('');
 
     document.getElementById('teams-picks-table').innerHTML = `
     <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border)">
-        <span class="text-[8px] uppercase tracking-widest" style="color:var(--muted)">Drivers & Constructors · ${confirmed?'Final Points':'Provisional'}</span>
+        <span class="text-[8px] uppercase tracking-widest" style="color:var(--muted)">Picks · ${roundData.confirmed?'Final Points':'Provisional'}</span>
     </div>
     <table class="w-full">
         <thead><tr class="border-b" style="background:var(--card2);border-color:var(--border)">
             <th class="p-3 text-left text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Pick</th>
-            <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Price${confirmed?' / Δ':''}</th>
+            <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Price</th>
             <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Pts</th>
         </tr></thead>
         <tbody>${rows}</tbody>
     </table>`;
 }
 
-// ─── onDataStatChange — show/hide panels ────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// DATA PAGE — Budget Stats
+// ═══════════════════════════════════════════════════════════════════
+let dataMode = 'drivers';
+let dataSort = { col:'price', dir:-1 };
+
+function setDataTab(mode) {
+    dataMode = mode;
+    ['drivers','constructors'].forEach(t => {
+        const btn = document.getElementById(`data-tab-${t}`);
+        if (t === mode) { btn.style.background='#ffffff'; btn.style.color='var(--text)'; }
+        else            { btn.style.background='';        btn.style.color='var(--muted)'; }
+    });
+    renderBudgetTable();
+}
+
+function sortDataCol(col) {
+    if (dataSort.col === col) dataSort.dir *= -1;
+    else { dataSort.col = col; dataSort.dir = -1; }
+    renderBudgetTable();
+}
+
 function onDataStatChange() {
     const v = document.getElementById('data-stat-select').value;
-    document.getElementById('data-budget-panel').style.display  = v === 'budget'  ? '' : 'none';
-    document.getElementById('data-fantasy-panel').style.display = v === 'fantasy' ? '' : 'none';
-    document.getElementById('data-teams-panel').style.display   = v === 'teams'   ? '' : 'none';
-    if (v === 'fantasy' && !F1_FANTASY) loadF1Fantasy();
-    if (v === 'teams'   && !F1_TEAMS)   loadF1Teams();
+    document.getElementById('data-budget-panel').style.display  = v==='budget'  ? '' : 'none';
+    document.getElementById('data-fantasy-panel').style.display = v==='fantasy' ? '' : 'none';
+    document.getElementById('data-teams-panel').style.display   = v==='teams'   ? '' : 'none';
+    if (v==='fantasy' && !F1_FANTASY) syncF1Fantasy();
+    if (v==='teams'   && !F1_TEAMS)   syncF1Teams();
+}
+
+async function loadF1Data() {
+    try {
+        const res = await fetch('./f1_budget_data.json', { cache:'no-cache' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        F1_DATA = await res.json();
+        renderBudgetTable();
+    } catch(e) {
+        document.getElementById('data-budget-table').style.display = 'none';
+        document.getElementById('data-budget-error').style.display = '';
+        document.getElementById('data-freshness-chip').textContent = 'No data';
+    }
+}
+
+function parseNum(v) {
+    if (v==null) return -Infinity;
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+    return isNaN(n) ? -Infinity : n;
+}
+
+function renderBudgetTable() {
+    if (!F1_DATA) return;
+    const chip = document.getElementById('data-freshness-chip');
+    chip.textContent = F1_DATA.last_updated ? F1_DATA.last_updated.split(' ')[0] : 'Loaded';
+    const simEl = document.getElementById('data-sim-label');
+    if (simEl) simEl.textContent = F1_DATA.simulation_label || '';
+
+    const raw = dataMode === 'drivers' ? (F1_DATA.drivers||[]) : (F1_DATA.constructors||[]);
+    if (!raw.length) {
+        document.getElementById('data-budget-error').style.display = '';
+        document.getElementById('data-budget-table').style.display = 'none';
+        return;
+    }
+
+    function doSort(arr) {
+        return [...arr].sort((a,b) => {
+            if (dataSort.col==='name') return dataSort.dir*String(a.name||'').localeCompare(String(b.name||''));
+            if (dataSort.col==='price') return dataSort.dir*((parseFloat(a.price)||0)-(parseFloat(b.price)||0));
+            if (dataSort.col.match(/^R\d+$/)) {
+                const av=parseFloat((a.race_pts||{})[dataSort.col]||'')||-Infinity;
+                const bv=parseFloat((b.race_pts||{})[dataSort.col]||'')||-Infinity;
+                return dataSort.dir*(av-bv);
+            }
+            const av=parseFloat(String(((a.req_pts||{})[dataSort.col])||'').replace(/[^\d.\-]/g,''));
+            const bv=parseFloat(String(((b.req_pts||{})[dataSort.col])||'').replace(/[^\d.\-]/g,''));
+            return dataSort.dir*((isNaN(av)?Infinity:av)-(isNaN(bv)?Infinity:bv));
+        });
+    }
+
+    const fmtPts = (val) => {
+        if (!val||val==='-'||val==='—') return '<span style="color:var(--muted)">—</span>';
+        const n=parseFloat(val);
+        const c=n>0?'#2ec4b6':n<0?'#ff4757':'var(--subtext)';
+        return `<span style="font-size:10px;color:${c}">${val}</span>`;
+    };
+    const fmtReq = (val, isNeg) => {
+        if (!val||val==='-'||val==='—') return '<span style="color:var(--muted)">—</span>';
+        const s=String(val).trim();
+        const n=parseFloat(s.replace(/[^\d.\-]/g,''));
+        let bg='transparent',fg='#cccccc';
+        if (isNeg) {
+            if (n<=-20){bg='#7b0000';fg='#ff9999';}
+            else if(n<=-10){bg='#5a2000';fg='#ffbb88';}
+            else if(n<=0){bg='#1a5a1a';fg='#aaffaa';}
+            else if(n<=15){bg='#2a6a2a';fg='#88ff88';}
+            else{bg='#3a3a00';fg='#ffff88';}
+        } else {
+            if(n<=0){bg='#1a5a1a';fg='#aaffaa';}
+            else if(n<=10){bg='#1a5a1a';fg='#aaffaa';}
+            else if(n<=25){bg='#4a4a00';fg='#ffff88';}
+            else if(n<=45){bg='#5a2a00';fg='#ffcc88';}
+            else{bg='#7b0000';fg='#ffaaaa';}
+        }
+        return `<div style="text-align:center;background:${bg};border-radius:3px;padding:2px 5px;font-size:10px;font-weight:bold;color:${fg}">${s}</div>`;
+    };
+
+    const TAG_COLORS = {
+        'MER':'#00d2be','FER':'#e8002d','RED':'#3671c6','MCL':'#ff8000',
+        'AMR':'#358c75','ALP':'#0093cc','WIL':'#005aff','HAA':'#888888',
+        'AUD':'#52e252','VRB':'#6692ff','CAD':'#cc0000','AST':'#358c75',
+        ...TEAM_TAG_COLORS,
+    };
+
+    function buildTierTable(tierEntries) {
+        if (!tierEntries.length) return '';
+        const sample=tierEntries[0];
+        const tierLabel=sample.tier_label||'';
+        const isA=sample.tier==='A';
+        const accent=isA?'#f4a100':'#3a86ff';
+        const nameLabel=dataMode==='drivers'?'DR':'CR';
+        const raceCols=Object.keys(sample.race_pts||{}).sort((a,b)=>parseInt(a.slice(1))-parseInt(b.slice(1)));
+        const pcLabels=sample.price_changes||Object.keys(sample.req_pts||{});
+        const ac=(col)=>dataSort.col===col?'#3a86ff':'var(--muted)';
+        const nRace=raceCols.length,nDrop=pcLabels.filter(p=>p.startsWith('-')).length,nRise=pcLabels.filter(p=>p.startsWith('+')).length;
+
+        let hdr1=`<tr style="background:var(--card2);border-top:2px solid ${accent}88"><td colspan="2" style="padding:5px 8px;font-size:8px;font-weight:bold;color:${accent};text-transform:uppercase;letter-spacing:.06em">${tierLabel}</td>`;
+        if(nRace>0) hdr1+=`<th colspan="${nRace}" class="p-1 text-center text-[8px]" style="color:var(--muted)">Pts</th>`;
+        if(nDrop>0) hdr1+=`<th colspan="${nDrop}" class="p-1 text-center text-[8px] font-bold" style="background:rgba(120,10,10,.5);color:#ff8888;border-radius:3px 3px 0 0">${pcLabels.filter(p=>p.startsWith('-')).join(' &nbsp; ')}</th>`;
+        if(nRise>0) hdr1+=`<th colspan="${nRise}" class="p-1 text-center text-[8px] font-bold" style="background:rgba(10,120,50,.5);color:#aaffcc;border-radius:3px 3px 0 0">${pcLabels.filter(p=>p.startsWith('+')).join(' &nbsp; ')}</th>`;
+        hdr1+='</tr>';
+
+        let hdr2=`<tr style="background:var(--card2);border-bottom:2px solid var(--border)"><th class="p-2 pl-3 text-left text-[8px] font-normal cursor-pointer select-none" style="color:${ac('name')}" onclick="sortDataCol('name')">${nameLabel} ↕</th><th class="p-2 text-center text-[8px] font-normal cursor-pointer select-none" style="color:${ac('price')}" onclick="sortDataCol('price')">$ ↕</th>`;
+        raceCols.forEach(rk=>{hdr2+=`<th class="p-1 text-center text-[8px] font-normal cursor-pointer select-none" style="color:${ac(rk)}" onclick="sortDataCol('${rk}')">${rk} ↕</th>`;});
+        pcLabels.forEach(pk=>{const isNeg=pk.startsWith('-');const pcol=isNeg?'#ff9999':'#aaffcc';hdr2+=`<th class="p-1 text-center text-[8px] font-normal cursor-pointer select-none" style="color:${dataSort.col===pk?'#3a86ff':pcol}" onclick="sortDataCol('${pk.replace(/'/g,"\\'")}')">Pts ↕</th>`;});
+        hdr2+='</tr>';
+
+        const sorted=doSort(tierEntries);
+        const dataRows=sorted.map(d=>{
+            const tag=d.name||'—';
+            const tc=TAG_COLORS[tag]||'#9090b8';
+            let row=`<tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><td class="p-2 pl-3 whitespace-nowrap"><span style="background:${tc}33;color:${tc};font-size:9px;font-weight:bold;padding:2px 7px;border-radius:5px">${tag}</span></td><td class="p-2 text-center font-mono text-[10px] whitespace-nowrap" style="color:var(--subtext)">${d.price||'—'}</td>`;
+            raceCols.forEach(rk=>{row+=`<td class="p-1 text-center">${fmtPts((d.race_pts||{})[rk])}</td>`;});
+            pcLabels.forEach(pk=>{const isNeg=pk.startsWith('-');row+=`<td class="p-1 text-center">${fmtReq((d.req_pts||{})[pk],isNeg)}</td>`;});
+            row+='</tr>';
+            return row;
+        }).join('');
+
+        return `<table class="w-full mb-4" style="min-width:380px;border-collapse:collapse;border:1px solid var(--border);border-radius:10px;overflow:hidden"><thead>${hdr1}${hdr2}</thead><tbody>${dataRows}</tbody></table>`;
+    }
+
+    const tierA=raw.filter(d=>d.tier==='A'||(d.tier==null&&parseFloat(d.price)>=18.5));
+    const tierB=raw.filter(d=>d.tier==='B'||(d.tier==null&&parseFloat(d.price)<18.5));
+    document.getElementById('data-budget-table').innerHTML=`<div style="overflow-x:auto">${buildTierTable(tierA)}${buildTierTable(tierB)}</div>`;
+    document.getElementById('data-budget-error').style.display='none';
+    document.getElementById('data-budget-table').style.display='';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEED DATA (fallback if history.json not loaded)
+// ═══════════════════════════════════════════════════════════════════
+const SEED_ROUND = {
+    round:1,key:'R01',label:'R01 · Australian GP 🇦🇺',flag:'🇦🇺',gp:'Australian GP',date:'2026-03-16',
+    standings:[
+        {player_key:'kevcedes',player_name:'Kevcedes',    owner:'Kevin Liang',    points:240,race_points:240,team_value:102.4},
+        {player_key:'grahhh',  player_name:'GRAHHH racing',owner:'Vivian Nguyen',  points:230,race_points:230,team_value:100.8},
+        {player_key:'leclaren',player_name:'LeClaren F1', owner:'Selina Le Khac', points:222,race_points:222,team_value:101.5},
+        {player_key:'juice',   player_name:'RACING JUICE',owner:'Justin Tran',    points:195,race_points:195,team_value:99.2},
+        {player_key:'thumbi',  player_name:'Thumbi',      owner:'Thomas George',  points:195,race_points:195,team_value:100.1},
+    ],
+    drivers:[],constructors:[],
+};
+
+
+// ═══════════════════════════════════════════════════════════════════
+// SCHEDULE
+// ═══════════════════════════════════════════════════════════════════
+const GP_FLAGS = {
+    'Australian Grand Prix':'🇦🇺','Chinese Grand Prix':'🇨🇳','Japanese Grand Prix':'🇯🇵',
+    'Bahrain Grand Prix':'🇧🇭','Saudi Arabian Grand Prix':'🇸🇦','Miami Grand Prix':'🇺🇸',
+    'Canadian Grand Prix':'🇨🇦','Monaco Grand Prix':'🇲🇨','Barcelona-Catalunya GP':'🇪🇸',
+    'Austrian Grand Prix':'🇦🇹','British Grand Prix':'🇬🇧','Belgian Grand Prix':'🇧🇪',
+    'Hungarian Grand Prix':'🇭🇺','Dutch Grand Prix':'🇳🇱','Italian Grand Prix':'🇮🇹',
+    'Spanish Grand Prix':'🇪🇸','Azerbaijan Grand Prix':'🇦🇿','Singapore Grand Prix':'🇸🇬',
+    'United States Grand Prix':'🇺🇸','Mexico City Grand Prix':'🇲🇽','São Paulo Grand Prix':'🇧🇷',
+    'Las Vegas Grand Prix':'🇺🇸','Qatar Grand Prix':'🇶🇦','Abu Dhabi Grand Prix':'🇦🇪',
+    'R1':'🇦🇺','R2':'🇨🇳',
+};
+
+const F1_SCHEDULE = [
+  {round:1,gp:'Australian Grand Prix',location:'Melbourne',circuit:'Albert Park Circuit',type:'traditional',date:'Mar 08',full_dates:'Mar 06-08',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:2,d:6,h:1,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:2,d:6,h:5,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:2,d:7,h:1,m:30},{key:'quali',label:'Qualifying',y:2026,mo:2,d:7,h:5,m:0},{key:'race',label:'Race',y:2026,mo:2,d:8,h:4,m:0}]},
+  {round:2,gp:'Chinese Grand Prix',location:'Shanghai',circuit:'Shanghai International Circuit',type:'sprint',date:'Mar 15',full_dates:'Mar 13-15',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:2,d:13,h:3,m:30},{key:'sq',label:'Sprint Qualifying',y:2026,mo:2,d:13,h:7,m:30},{key:'sprint',label:'Sprint Race',y:2026,mo:2,d:14,h:4,m:0},{key:'quali',label:'Qualifying',y:2026,mo:2,d:14,h:8,m:0},{key:'race',label:'Race',y:2026,mo:2,d:15,h:7,m:0}]},
+  {round:3,gp:'Japanese Grand Prix',location:'Suzuka',circuit:'Suzuka Circuit',type:'traditional',date:'Mar 29',full_dates:'Mar 27-29',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:2,d:27,h:2,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:2,d:27,h:6,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:2,d:28,h:2,m:30},{key:'quali',label:'Qualifying',y:2026,mo:2,d:28,h:6,m:0},{key:'race',label:'Race',y:2026,mo:2,d:29,h:5,m:0}]},
+  {round:4,gp:'Bahrain Grand Prix',location:'Sakhir',circuit:'Bahrain International Circuit',type:'traditional',date:'Apr 12',full_dates:'Apr 10-12',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:3,d:10,h:12,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:3,d:10,h:16,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:3,d:11,h:12,m:30},{key:'quali',label:'Qualifying',y:2026,mo:3,d:11,h:16,m:0},{key:'race',label:'Race',y:2026,mo:3,d:12,h:15,m:0}]},
+  {round:5,gp:'Saudi Arabian Grand Prix',location:'Jeddah',circuit:'Jeddah Corniche Circuit',type:'traditional',date:'Apr 19',full_dates:'Apr 17-19',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:3,d:17,h:14,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:3,d:17,h:18,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:3,d:18,h:14,m:30},{key:'quali',label:'Qualifying',y:2026,mo:3,d:18,h:18,m:0},{key:'race',label:'Race',y:2026,mo:3,d:19,h:17,m:0}]},
+  {round:6,gp:'Miami Grand Prix',location:'Miami',circuit:'Miami International Autodrome',type:'sprint',date:'May 03',full_dates:'May 01-03',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:4,d:1,h:16,m:30},{key:'sq',label:'Sprint Qualifying',y:2026,mo:4,d:1,h:20,m:30},{key:'sprint',label:'Sprint Race',y:2026,mo:4,d:2,h:15,m:0},{key:'quali',label:'Qualifying',y:2026,mo:4,d:2,h:20,m:0},{key:'race',label:'Race',y:2026,mo:4,d:3,h:19,m:30}]},
+  {round:7,gp:'Canadian Grand Prix',location:'Montreal',circuit:'Circuit Gilles Villeneuve',type:'sprint',date:'May 24',full_dates:'May 22-24',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:4,d:22,h:17,m:30},{key:'sq',label:'Sprint Qualifying',y:2026,mo:4,d:22,h:21,m:30},{key:'sprint',label:'Sprint Race',y:2026,mo:4,d:23,h:16,m:0},{key:'quali',label:'Qualifying',y:2026,mo:4,d:23,h:20,m:0},{key:'race',label:'Race',y:2026,mo:4,d:24,h:18,m:0}]},
+  {round:8,gp:'Monaco Grand Prix',location:'Monte Carlo',circuit:'Circuit de Monaco',type:'traditional',date:'Jun 07',full_dates:'Jun 05-07',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:5,d:5,h:10,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:5,d:5,h:14,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:5,d:6,h:9,m:0},{key:'quali',label:'Qualifying',y:2026,mo:5,d:6,h:13,m:0},{key:'race',label:'Race',y:2026,mo:5,d:7,h:13,m:0}]},
+  {round:9,gp:'Barcelona-Catalunya GP',location:'Barcelona',circuit:'Circuit de Barcelona-Catalunya',type:'traditional',date:'Jun 14',full_dates:'Jun 12-14',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:5,d:12,h:11,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:5,d:12,h:15,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:5,d:13,h:10,m:30},{key:'quali',label:'Qualifying',y:2026,mo:5,d:13,h:14,m:0},{key:'race',label:'Race',y:2026,mo:5,d:14,h:13,m:0}]},
+  {round:10,gp:'Austrian Grand Prix',location:'Spielberg',circuit:'Red Bull Ring',type:'traditional',date:'Jun 28',full_dates:'Jun 26-28',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:5,d:26,h:11,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:5,d:26,h:15,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:5,d:27,h:10,m:30},{key:'quali',label:'Qualifying',y:2026,mo:5,d:27,h:14,m:0},{key:'race',label:'Race',y:2026,mo:5,d:28,h:13,m:0}]},
+  {round:11,gp:'British Grand Prix',location:'Silverstone',circuit:'Silverstone Circuit',type:'sprint',date:'Jul 05',full_dates:'Jul 03-05',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:6,d:3,h:11,m:30},{key:'sq',label:'Sprint Qualifying',y:2026,mo:6,d:3,h:15,m:30},{key:'sprint',label:'Sprint Race',y:2026,mo:6,d:4,h:11,m:0},{key:'quali',label:'Qualifying',y:2026,mo:6,d:4,h:15,m:0},{key:'race',label:'Race',y:2026,mo:6,d:5,h:14,m:0}]},
+  {round:12,gp:'Belgian Grand Prix',location:'Spa-Francorchamps',circuit:'Circuit de Spa-Francorchamps',type:'traditional',date:'Jul 19',full_dates:'Jul 17-19',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:6,d:17,h:11,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:6,d:17,h:15,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:6,d:18,h:10,m:30},{key:'quali',label:'Qualifying',y:2026,mo:6,d:18,h:14,m:0},{key:'race',label:'Race',y:2026,mo:6,d:19,h:13,m:0}]},
+  {round:13,gp:'Hungarian Grand Prix',location:'Budapest',circuit:'Hungaroring',type:'traditional',date:'Jul 26',full_dates:'Jul 24-26',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:6,d:24,h:11,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:6,d:24,h:15,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:6,d:25,h:10,m:30},{key:'quali',label:'Qualifying',y:2026,mo:6,d:25,h:14,m:0},{key:'race',label:'Race',y:2026,mo:6,d:26,h:13,m:0}]},
+  {round:14,gp:'Dutch Grand Prix',location:'Zandvoort',circuit:'Circuit Zandvoort',type:'sprint',date:'Aug 23',full_dates:'Aug 21-23',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:7,d:21,h:11,m:30},{key:'sq',label:'Sprint Qualifying',y:2026,mo:7,d:21,h:15,m:30},{key:'sprint',label:'Sprint Race',y:2026,mo:7,d:22,h:11,m:0},{key:'quali',label:'Qualifying',y:2026,mo:7,d:22,h:15,m:0},{key:'race',label:'Race',y:2026,mo:7,d:23,h:13,m:0}]},
+  {round:15,gp:'Italian Grand Prix',location:'Monza',circuit:'Autodromo Nazionale Monza',type:'traditional',date:'Sep 06',full_dates:'Sep 04-06',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:8,d:4,h:11,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:8,d:4,h:15,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:8,d:5,h:10,m:30},{key:'quali',label:'Qualifying',y:2026,mo:8,d:5,h:14,m:0},{key:'race',label:'Race',y:2026,mo:8,d:6,h:13,m:0}]},
+  {round:16,gp:'Spanish Grand Prix',location:'Madrid',circuit:'Madrid Street Circuit',type:'traditional',date:'Sep 13',full_dates:'Sep 11-13',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:8,d:11,h:11,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:8,d:11,h:15,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:8,d:12,h:10,m:30},{key:'quali',label:'Qualifying',y:2026,mo:8,d:12,h:14,m:0},{key:'race',label:'Race',y:2026,mo:8,d:13,h:13,m:0}]},
+  {round:17,gp:'Azerbaijan Grand Prix',location:'Baku',circuit:'Baku City Circuit',type:'traditional',date:'Sep 26',full_dates:'Sep 24-26',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:8,d:24,h:9,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:8,d:24,h:13,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:8,d:25,h:9,m:30},{key:'quali',label:'Qualifying',y:2026,mo:8,d:25,h:13,m:0},{key:'race',label:'Race',y:2026,mo:8,d:26,h:11,m:0}]},
+  {round:18,gp:'Singapore Grand Prix',location:'Marina Bay',circuit:'Marina Bay Street Circuit',type:'sprint',date:'Oct 11',full_dates:'Oct 09-11',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:9,d:9,h:9,m:30},{key:'sq',label:'Sprint Qualifying',y:2026,mo:9,d:9,h:13,m:30},{key:'sprint',label:'Sprint Race',y:2026,mo:9,d:10,h:9,m:0},{key:'quali',label:'Qualifying',y:2026,mo:9,d:10,h:13,m:0},{key:'race',label:'Race',y:2026,mo:9,d:11,h:12,m:0}]},
+  {round:19,gp:'United States Grand Prix',location:'Austin',circuit:'Circuit of the Americas',type:'traditional',date:'Oct 25',full_dates:'Oct 23-25',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:9,d:23,h:18,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:9,d:23,h:22,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:9,d:24,h:18,m:30},{key:'quali',label:'Qualifying',y:2026,mo:9,d:24,h:22,m:0},{key:'race',label:'Race',y:2026,mo:9,d:25,h:20,m:0}]},
+  {round:20,gp:'Mexico City Grand Prix',location:'Mexico City',circuit:'Autódromo Hermanos Rodríguez',type:'traditional',date:'Nov 01',full_dates:'Oct 30-Nov 01',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:9,d:30,h:19,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:9,d:30,h:23,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:9,d:31,h:19,m:30},{key:'quali',label:'Qualifying',y:2026,mo:9,d:31,h:23,m:0},{key:'race',label:'Race',y:2026,mo:10,d:1,h:20,m:0}]},
+  {round:21,gp:'São Paulo Grand Prix',location:'São Paulo',circuit:'Autódromo José Carlos Pace',type:'traditional',date:'Nov 08',full_dates:'Nov 06-08',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:10,d:6,h:14,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:10,d:6,h:18,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:10,d:7,h:14,m:30},{key:'quali',label:'Qualifying',y:2026,mo:10,d:7,h:18,m:0},{key:'race',label:'Race',y:2026,mo:10,d:8,h:17,m:0}]},
+  {round:22,gp:'Las Vegas Grand Prix',location:'Las Vegas',circuit:'Las Vegas Strip Circuit',type:'traditional',date:'Nov 21',full_dates:'Nov 19-21',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:10,d:20,h:2,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:10,d:20,h:6,m:30},{key:'fp3',label:'Free Practice 3',y:2026,mo:10,d:21,h:2,m:0},{key:'quali',label:'Qualifying',y:2026,mo:10,d:21,h:6,m:0},{key:'race',label:'Race',y:2026,mo:10,d:22,h:6,m:0}]},
+  {round:23,gp:'Qatar Grand Prix',location:'Lusail',circuit:'Lusail International Circuit',type:'sprint',date:'Nov 29',full_dates:'Nov 27-29',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:10,d:27,h:13,m:30},{key:'sq',label:'Sprint Qualifying',y:2026,mo:10,d:27,h:17,m:30},{key:'sprint',label:'Sprint Race',y:2026,mo:10,d:28,h:13,m:0},{key:'quali',label:'Qualifying',y:2026,mo:10,d:28,h:17,m:0},{key:'race',label:'Race',y:2026,mo:10,d:29,h:15,m:0}]},
+  {round:24,gp:'Abu Dhabi Grand Prix',location:'Yas Island',circuit:'Yas Marina Circuit',type:'traditional',date:'Dec 06',full_dates:'Dec 04-06',sessions:[{key:'fp1',label:'Free Practice 1',y:2026,mo:11,d:4,h:9,m:30},{key:'fp2',label:'Free Practice 2',y:2026,mo:11,d:4,h:13,m:0},{key:'fp3',label:'Free Practice 3',y:2026,mo:11,d:5,h:9,m:30},{key:'quali',label:'Qualifying',y:2026,mo:11,d:5,h:13,m:0},{key:'race',label:'Race',y:2026,mo:11,d:6,h:13,m:0}]},
+];
+
+function sydneyOffsetHours(utcDate) {
+    const y=utcDate.getUTCFullYear();
+    const apr1=new Date(Date.UTC(y,3,1));
+    const aprSun=new Date(Date.UTC(y,3,1+(7-apr1.getUTCDay())%7,2,0,0));
+    const oct1=new Date(Date.UTC(y,9,1));
+    const octSun=new Date(Date.UTC(y,9,1+(7-oct1.getUTCDay())%7,16,0,0));
+    if(utcDate>=aprSun&&utcDate<octSun) return 10;
+    return 11;
+}
+function utcToSydney(d){return new Date(d.getTime()+sydneyOffsetHours(d)*3600000);}
+function buildSessions(race){return race.sessions.map(s=>{const utcDate=new Date(Date.UTC(s.y,s.mo,s.d,s.h,s.m,0));return{key:s.key,label:s.label,utcDate,sydDate:utcToSydney(utcDate)};});}
+function fmtSyd(d){const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];let h=d.getUTCHours(),m=d.getUTCMinutes();const ampm=h>=12?'PM':'AM';h=h%12||12;return`${days[d.getUTCDay()]} ${d.getUTCDate()} ${months[d.getUTCMonth()]}, ${h}:${String(m).padStart(2,'0')} ${ampm}`;}
+function fmtCountdown(ms){if(ms<=0)return'00:00:00';const s=Math.floor(ms/1000);const dd=Math.floor(s/86400);const hh=Math.floor((s%86400)/3600);const mm=Math.floor((s%3600)/60);const ss=s%60;if(dd>0)return`${dd}d ${String(hh).padStart(2,'0')}h ${String(mm).padStart(2,'0')}m`;return`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;}
+
+let _schedCountdownInterval=null;
+function populateScheduleDropdown(){
+    const sel=document.getElementById('sched-round-select');if(!sel)return;
+    const nowUtc=new Date();let defaultRound=F1_SCHEDULE[0].round;
+    for(const r of F1_SCHEDULE){const sessions=buildSessions(r);const last=sessions[sessions.length-1];if(last.utcDate>=nowUtc){defaultRound=r.round;break;}}
+    sel.innerHTML=F1_SCHEDULE.map(r=>`<option value="${r.round}" ${r.round===defaultRound?'selected':''}>${GP_FLAGS[r.gp]||'🏁'} R${String(r.round).padStart(2,'0')} · ${r.gp} · ${r.date}</option>`).join('');
+    renderScheduleRound();startCountdown();
+}
+function startCountdown(){if(_schedCountdownInterval)clearInterval(_schedCountdownInterval);_schedCountdownInterval=setInterval(updateCountdown,1000);updateCountdown();}
+function updateCountdown(){
+    const nowUtc=new Date();let nextSession=null,nextRace=null;
+    outer:for(const r of F1_SCHEDULE){for(const s of buildSessions(r)){if(s.utcDate>nowUtc){nextSession=s;nextRace=r;break outer;}}}
+    const evEl=document.getElementById('sched-countdown-event'),tmEl=document.getElementById('sched-countdown-timer'),whEl=document.getElementById('sched-countdown-when');
+    if(!nextSession){if(evEl)evEl.textContent='Season Complete 🏁';if(tmEl)tmEl.textContent='—';return;}
+    const flag=GP_FLAGS[nextRace.gp]||'🏁';
+    if(evEl)evEl.textContent=`${flag} ${nextRace.gp} · ${nextSession.label}`;
+    if(tmEl)tmEl.textContent=fmtCountdown(nextSession.utcDate-nowUtc);
+    if(whEl)whEl.textContent=fmtSyd(nextSession.sydDate);
+}
+function renderScheduleRound(){
+    const roundNum=parseInt(document.getElementById('sched-round-select').value);
+    const race=F1_SCHEDULE.find(r=>r.round===roundNum);if(!race)return;
+    const sessions=buildSessions(race);const nowUtc=new Date();const flag=GP_FLAGS[race.gp]||'🏁';
+    let nextIdx=sessions.findIndex(s=>s.utcDate>nowUtc);
+    const rows=sessions.map((s,i)=>{
+        const isPast=s.utcDate<=nowUtc,isNext=i===nextIdx;
+        let statusBg,statusColor,statusTag;
+        if(isPast){statusBg='rgba(255,71,87,.10)';statusColor='#ff4757';statusTag='FINISHED';}
+        else if(isNext){statusBg='rgba(46,196,182,.15)';statusColor='#2ec4b6';statusTag='UPCOMING NEXT ▶';}
+        else{statusBg='rgba(46,196,182,.06)';statusColor='#74d9d0';statusTag='UPCOMING';}
+        const rowBg=isNext?'rgba(46,196,182,.04)':isPast?'rgba(255,71,87,.03)':'';
+        return`<tr style="border-bottom:1px solid var(--border);background:${rowBg}"><td class="p-3"><div class="font-bold text-[11px]" style="color:var(--text)">${s.label}</div><div class="text-[9px] mt-0.5" style="color:var(--muted)">${fmtSyd(s.sydDate)} AEDT/AEST</div></td><td class="p-3 text-right" style="vertical-align:middle;"><span style="background:${statusBg};color:${statusColor};font-size:7px;font-weight:bold;padding:2px 6px;border-radius:5px;letter-spacing:.05em;white-space:nowrap;">${statusTag}</span></td></tr>`;
+    }).join('');
+    document.getElementById('sched-session-table').innerHTML=`<div style="padding:12px 14px 8px;border-bottom:1px solid var(--border);"><div class="fun text-base" style="color:var(--text)">${flag} ${race.gp}</div><div class="text-[9px] mt-0.5" style="color:var(--subtext)">${race.circuit} · ${race.full_dates} · ${race.type==='sprint'?'⚡ Sprint Weekend':'🏁 Traditional Weekend'}</div></div><table class="w-full"><tbody>${rows}</tbody></table>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════════
 function navigate(page) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('page-' + page).classList.add('active');
-    document.getElementById('nav-'  + page).classList.add('active');
-    if (page === 'data' && !F1_DATA) loadF1Data();
-    window.scrollTo(0, 0);
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('page-'+page).classList.add('active');
+    document.getElementById('nav-'+page).classList.add('active');
+    if(page==='data'&&!F1_DATA) loadF1Data();
+    window.scrollTo(0,0);
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    syncData();               // loads history.json → renders home/h2h
-    populateScheduleDropdown(); // schedule is static, render immediately
+    syncAll();
+    populateScheduleDropdown();
 });
 </script>
 </body>

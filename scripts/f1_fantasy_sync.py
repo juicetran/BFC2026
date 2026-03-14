@@ -123,10 +123,22 @@ async def sync():
     ts      = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     headers = build_headers(raw_cookies)
 
-    async with httpx.AsyncClient(headers=headers, timeout=30, follow_redirects=True) as client:
+    async with httpx.AsyncClient(headers=headers, timeout=60, follow_redirects=True) as client:
 
-        # 1. Schedule
+        # 1. Schedule — use local 2026_f1_schedule.json for GP names, API for lock status
         print("  Fetching schedule...")
+
+        # Load local schedule for proper GP names
+        local_sched_file = Path(__file__).parent.parent / "2026_f1_schedule.json"
+        local_gp_names = {}
+        if local_sched_file.exists():
+            try:
+                local_sched = json.loads(local_sched_file.read_text())
+                for r in local_sched.get("schedule", []):
+                    local_gp_names[int(r["round"])] = r["gp"]
+            except Exception:
+                pass
+
         sched    = await fetch(client, f"{BASE}/feeds/v2/schedule/raceday_en.json")
         fixtures = sched.get("Data", {}).get("fixtures", [])
         matchdays = {}
@@ -136,9 +148,10 @@ async def sync():
                 continue
             mdid = int(mdid)
             if mdid not in matchdays:
+                gp_name = local_gp_names.get(mdid) or fx.get("Venue") or fx.get("RaceName") or f"R{mdid}"
                 matchdays[mdid] = {
                     "round":    mdid,
-                    "gp":       fx.get("Venue", fx.get("RaceName", f"R{mdid}")),
+                    "gp":       gp_name,
                     "date":     fx.get("GameDate", "")[:10],
                     "finished": int(fx.get("GDIsLocked", 0)) == 1,
                 }
@@ -197,10 +210,26 @@ async def sync():
 
         # 4. League standings
         print("  Fetching league standings...")
-        league_raw    = await fetch(client, f"{BASE}/services/user/leagues/{LEAGUE_ID}/leaguedetails/1/1/100/1")
-        league_val    = league_raw.get("Data", {}).get("Value", {})
-        league_name   = league_val.get("leagueName", "Baby Formula Championship") if isinstance(league_val, dict) else "Baby Formula Championship"
-        standings_raw = league_val.get("leagueStandings", []) if isinstance(league_val, dict) else (league_val if isinstance(league_val, list) else [])
+        # Correct endpoints discovered from HAR analysis
+        # LEAGUE_ID here is the numeric ID e.g. 5008603
+        # LEAGUE_CODE is the alphanumeric code e.g. C4JXU0PEO03 (set in env as F1_FANTASY_LEAGUE_ID)
+        import time
+        buster = int(time.time() * 1000)
+
+        # Get league name from league info endpoint
+        league_info_raw = await fetch(client, f"{BASE}/services/user/league/getleagueinfo/{LEAGUE_ID}?buster={buster}")
+        league_info_val = league_info_raw.get("Data", {}).get("Value", {})
+        from urllib.parse import unquote as _uq
+        league_name = _uq(league_info_val.get("leagueName", "Baby Formula Championship"))
+        numeric_league_id = league_info_val.get("leagueId", "")
+
+        # Get standings from leaderboard feed (uses numeric league ID)
+        buster2 = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        standings_url = f"{BASE}/feeds/leaderboard/privateleague/list_1_{numeric_league_id}_0_1.json?buster={buster2}"
+        print(f"  Standings URL: {standings_url}")
+        standings_raw_resp = await fetch(client, standings_url)
+        standings_raw = standings_raw_resp.get("Value", {}).get("leaderboard", [])
+        print(f"  Found {len(standings_raw)} players")
 
         teams_output = {
             "last_updated": ts,
@@ -211,14 +240,16 @@ async def sync():
         }
 
         for entry in standings_raw:
-            uid    = str(entry.get("socialId") or entry.get("userId") or entry.get("teamId", ""))
+            uid    = str(entry.get("social_id", ""))
             our_id = PLAYER_MAP.get(uid, uid)
             teams_output["players"].append({
                 "id":         our_id,
-                "name":       unquote(entry.get("teamName") or entry.get("name") or our_id),
+                "name":       unquote(entry.get("team_name", our_id)),
                 "emoji":      "👤",
                 "f1_user_id": uid,
-                "guid":       entry.get("guid", ""),
+                "guid":       entry.get("user_guid", ""),
+                "cur_points": entry.get("cur_points", 0),
+                "cur_rank":   entry.get("cur_rank", 0),
             })
 
         if teams_output["players"]:
@@ -229,7 +260,53 @@ async def sync():
             print()
 
         # 5. Per-matchday picks
-        for mdid in sorted(matchdays.keys()):
+        # Load existing f1_teams.json to reuse already-fetched round data
+        existing_rounds = {}
+        teams_json_path = Path(__file__).parent.parent / "f1_teams.json"
+        if teams_json_path.exists():
+            try:
+                existing = json.loads(teams_json_path.read_text())
+                for r in existing.get("rounds", []):
+                    # Only keep rounds that have actual pick data
+                    has_data = any(len(t.get("picks", [])) > 0 for t in r.get("teams", []))
+                    if has_data:
+                        existing_rounds[r["round"]] = r
+                if existing_rounds:
+                    print(f"  Cached rounds found: {sorted(existing_rounds.keys())}")
+            except Exception as e:
+                print(f"  Could not load existing f1_teams.json: {e}")
+
+        all_mdids = sorted(matchdays.keys())
+        # Only fetch: completed rounds not already cached + next upcoming round
+        next_round = next((m for m in all_mdids if m not in completed_mds), None)
+        rounds_to_fetch = set()
+        for m in completed_mds:
+            if m not in existing_rounds:
+                rounds_to_fetch.add(m)
+        if next_round:
+            rounds_to_fetch.add(next_round)
+
+        if rounds_to_fetch:
+            print(f"  Fetching picks for rounds: {sorted(rounds_to_fetch)}")
+        else:
+            print(f"  All completed rounds already cached — no new API calls needed.")
+
+        for mdid in all_mdids:
+            # Reuse cached data if available
+            if mdid in existing_rounds and mdid not in rounds_to_fetch:
+                cached = existing_rounds[mdid]
+                # Update GP name in case it changed
+                cached["gp"] = matchdays[mdid]["gp"]
+                teams_output["rounds"].append(cached)
+                continue
+
+            if mdid not in rounds_to_fetch:
+                # Future round — empty placeholder
+                teams_output["rounds"].append({
+                    "round": mdid, "gp": matchdays[mdid]["gp"],
+                    "confirmed": False, "teams": []
+                })
+                continue
             finished     = mdid in completed_mds
             round_record = {"round": mdid, "gp": matchdays[mdid]["gp"], "confirmed": finished, "teams": []}
 

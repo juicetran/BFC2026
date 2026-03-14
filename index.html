@@ -902,7 +902,7 @@ function renderBudgetTable() {
                     +   'padding:2px 7px;border-radius:5px;font-family:\'Share Tech Mono\',monospace">' + tag + '</span>'
                     + '</td>'
                     + '<td class="p-2 text-center font-mono text-[10px] whitespace-nowrap" style="color:var(--subtext)">'
-                    +   (d.price||'—')
+                    +   (d.price ? d.price : '<span style="color:var(--muted)">—</span>')
                     + '</td>';
 
             // Race pts columns

@@ -740,7 +740,6 @@ function parseNum(v) {
 function renderBudgetTable() {
     if (!F1_DATA) return;
 
-    // ── Freshness chip ──
     const chip = document.getElementById('data-freshness-chip');
     chip.textContent = F1_DATA.last_updated ? F1_DATA.last_updated.split(' ')[0] : 'Loaded';
     const simEl = document.getElementById('data-sim-label');
@@ -748,70 +747,72 @@ function renderBudgetTable() {
 
     const raw = (dataMode === 'drivers' ? (F1_DATA.drivers || []) : (F1_DATA.constructors || []));
 
-    // ── Sort ──────────────────────────────────────────────────────
+    if (!raw.length) {
+        document.getElementById('data-budget-error').style.display = '';
+        document.getElementById('data-budget-table').style.display = 'none';
+        return;
+    }
+
+    // ── Sort within each tier ──────────────────────────────────
     function doSort(arr) {
         const col = dataSort.col;
-        if (!col || col === 'none') return arr;
+        if (!col) return arr;
         return [...arr].sort((a, b) => {
             if (col === 'name') return dataSort.dir * String(a.name||'').localeCompare(String(b.name||''));
-            if (col === 'tier') return dataSort.dir * String(a.tier||'').localeCompare(String(b.tier||''));
-            // Numeric sort — strip ≤ signs
             const av = parseFloat(String(a[col]||'').replace(/[^\d.\-]/g,''));
             const bv = parseFloat(String(b[col]||'').replace(/[^\d.\-]/g,''));
-            const an = isNaN(av) ? Infinity : av;
-            const bn = isNaN(bv) ? Infinity : bv;
-            return dataSort.dir * (an - bn);
+            return dataSort.dir * ((isNaN(av)?Infinity:av) - (isNaN(bv)?Infinity:bv));
         });
     }
 
-    // ── Tier badge ────────────────────────────────────────────────
-    const tierBadge = (tier) => {
-        if (!tier) return '';
-        const c = tier === 'A' ? '#f4a100' : '#3a86ff';
-        return '<span style="background:' + c + '33;color:' + c
-             + ';font-size:7px;font-weight:bold;padding:1px 4px;border-radius:3px;'
-             + 'margin-left:4px;vertical-align:middle;letter-spacing:.04em">'
-             + tier + '</span>';
+    // ── Format R0/R1 actual points ─────────────────────────────
+    const fmtPts = (val) => {
+        if (!val || val === '-' || val === '—')
+            return '<span style="color:var(--muted)">—</span>';
+        const n = parseFloat(val);
+        const c = n > 0 ? '#2ec4b6' : n < 0 ? '#ff4757' : 'var(--subtext)';
+        return '<span style="font-size:10px;color:' + c + '">' + val + '</span>';
     };
 
-    // ── Format a required-points cell ─────────────────────────────
-    // Values look like "≤-6", "≤11", "-14", "25" etc.
-    const fmtReq = (val, isNeg) => {
-        if (val == null || val === '' || val === '-')
+    // ── Format required-points cell ────────────────────────────
+    // Values: "≤-17", "≤2", "-16", "1", "17" etc.
+    // -0.3 col: very negative = dark red, near 0 = green
+    // -0.1 col: same logic but lighter
+    // +0.1/+0.3 cols: low positive = dark green, high = dark red
+    const fmtReq = (val, col) => {
+        if (!val || val === '-' || val === '—')
             return '<span style="color:var(--muted)">—</span>';
         const s = String(val).trim();
-        // Parse the numeric part
         const n = parseFloat(s.replace(/[^\d.\-]/g, ''));
-        // Colour: for drop cols (isNeg=true) high neg = bad (red bg), small = ok
-        // For rise cols (isNeg=false) low positive = likely, high = hard
-        let bg, fg;
-        if (isNeg) {
-            // -0.3 / -0.1 columns: lower threshold = easier price drop
-            bg = n <= -20 ? 'rgba(180,20,20,.55)'
-               : n <= -5  ? 'rgba(160,60,0,.45)'
-               : n <= 5   ? 'rgba(80,120,20,.35)'
-               :             'transparent';
-            fg = n <= 5 ? '#ccffcc' : '#ffddaa';
-        } else {
-            // +0.1 / +0.3 columns: higher pts needed = harder price rise
-            bg = n >= 40  ? 'rgba(180,20,20,.55)'
-               : n >= 20  ? 'rgba(160,60,0,.45)'
-               : n >= 5   ? 'rgba(20,100,60,.45)'
-               :             'rgba(20,130,80,.35)';
-            fg = '#ddffd4';
+        let bg = 'transparent', fg = 'var(--subtext)';
+        if (col === 'pts_m03') {
+            // -0.3: lower (more negative) = darker red
+            if      (n <= -20) { bg='#7b0000'; fg='#ffaaaa'; }
+            else if (n <= -10) { bg='#8b3000'; fg='#ffcc99'; }
+            else if (n <= 0)   { bg='#2d6a2d'; fg='#aaffaa'; }
+            else               { bg='#1a4a1a'; fg='#88cc88'; }
+        } else if (col === 'pts_m01') {
+            // -0.1: similar but less intense
+            if      (n <= -20) { bg='#6b1010'; fg='#ffbbbb'; }
+            else if (n <= -5)  { bg='#7a3500'; fg='#ffcc99'; }
+            else if (n <= 5)   { bg='#2d5a2d'; fg='#aaffaa'; }
+            else               { bg='transparent'; fg='var(--subtext)'; }
+        } else if (col === 'pts_p01') {
+            // +0.1: low = green, high = red
+            if      (n <= 5)   { bg='#2d6a2d'; fg='#aaffaa'; }
+            else if (n <= 15)  { bg='#4a5a00'; fg='#eeff88'; }
+            else if (n <= 30)  { bg='#5a3000'; fg='#ffcc88'; }
+            else               { bg='#7b0000'; fg='#ffaaaa'; }
+        } else if (col === 'pts_p03') {
+            // +0.3: similar, higher thresholds
+            if      (n <= 10)  { bg='#2d6a2d'; fg='#aaffaa'; }
+            else if (n <= 25)  { bg='#4a5a00'; fg='#eeff88'; }
+            else if (n <= 45)  { bg='#5a3000'; fg='#ffcc88'; }
+            else               { bg='#7b0000'; fg='#ffaaaa'; }
         }
         return '<div style="text-align:center;background:' + bg
-             + ';border-radius:3px;padding:1px 4px;font-size:10px;font-weight:bold;color:' + fg + '">'
+             + ';border-radius:3px;padding:2px 4px;font-size:10px;font-weight:bold;color:' + fg + '">'
              + s + '</div>';
-    };
-
-    // ── Pts cell (R0/R1 actual points) ────────────────────────────
-    const fmtPts = (val) => {
-        if (val == null || val === '' || val === '-')
-            return '<span style="color:var(--muted)">—</span>';
-        const n = parseFloat(String(val));
-        const c = n > 0 ? '#2ec4b6' : n < 0 ? '#ff4757' : 'var(--subtext)';
-        return '<span style="color:' + c + ';font-size:10px">' + val + '</span>';
     };
 
     const TAG_COLORS = {
@@ -826,7 +827,7 @@ function renderBudgetTable() {
         'HAD':'#cc0000','PER':'#cc0000',
     };
 
-    // Split into Tier A first, then Tier B, preserving scraped order within each
+    // ── Split tiers using scraped tier field, fallback to 18.5M ──
     const tierA = raw.filter(d => d.tier === 'A' || (d.tier == null && parseFloat(d.price) >= 18.5));
     const tierB = raw.filter(d => d.tier === 'B' || (d.tier == null && parseFloat(d.price) <  18.5));
     const tierALabel = raw.find(d => d.tier === 'A')?.tier_label || 'Tier A (>=18.5M)';
@@ -835,81 +836,67 @@ function renderBudgetTable() {
     const buildRows = (arr) => doSort(arr).map(d => {
         const tag = d.name || '—';
         const tc  = TAG_COLORS[tag] || '#9090b8';
-        const px  = d.price || '—';
         return '<tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)"'
              + ' onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'\'">'
-             // Tag + tier badge
              + '<td class="p-2 pl-3 whitespace-nowrap">'
-             +   '<span style="background:' + tc + '22;color:' + tc + ';font-size:9px;font-weight:bold;'
-             +   'padding:2px 6px;border-radius:5px;font-family:\'Share Tech Mono\',monospace">' + tag + '</span>'
+             +   '<span style="background:' + tc + '33;color:' + tc + ';font-size:9px;font-weight:bold;'
+             +   'padding:2px 7px;border-radius:5px;font-family:\'Share Tech Mono\',monospace">' + tag + '</span>'
              + '</td>'
-             // Price
-             + '<td class="p-2 text-center font-mono text-[10px] whitespace-nowrap" style="color:var(--subtext)">' + px + '</td>'
-             // R0 Pts (season total)
+             + '<td class="p-2 text-center font-mono text-[10px] whitespace-nowrap" style="color:var(--subtext)">' + (d.price||'—') + '</td>'
              + '<td class="p-2 text-center">' + fmtPts(d.pts_r0) + '</td>'
-             // R1 Pts
              + '<td class="p-2 text-center" style="border-right:2px solid var(--border)">' + fmtPts(d.pts_r1) + '</td>'
-             // -0.3 required pts
-             + '<td class="p-1 text-center" style="border-left:1px solid var(--border)">' + fmtReq(d.pts_m03, true)  + '</td>'
-             // -0.1 required pts
-             + '<td class="p-1 text-center">' + fmtReq(d.pts_m01, true)  + '</td>'
-             // +0.1 required pts
-             + '<td class="p-1 text-center">' + fmtReq(d.pts_p01, false) + '</td>'
-             // +0.3 required pts
-             + '<td class="p-1 text-center">' + fmtReq(d.pts_p03, false) + '</td>'
+             + '<td class="p-1 text-center">' + fmtReq(d.pts_m03,'pts_m03') + '</td>'
+             + '<td class="p-1 text-center">' + fmtReq(d.pts_m01,'pts_m01') + '</td>'
+             + '<td class="p-1 text-center">' + fmtReq(d.pts_p01,'pts_p01') + '</td>'
+             + '<td class="p-1 text-center">' + fmtReq(d.pts_p03,'pts_p03') + '</td>'
              + '</tr>';
     }).join('');
 
     const ac  = (col) => dataSort.col === col ? '#3a86ff' : 'var(--muted)';
     const thR = (col, lbl, extra='') =>
         '<th rowspan="2" class="p-2 text-[8px] font-normal cursor-pointer select-none whitespace-nowrap"'
-        + ' style="color:' + ac(col) + ';' + extra + '" onclick="sortDataCol(\'' + col + '\')">' + lbl + '</th>';
+        + ' style="' + extra + 'color:' + ac(col) + '" onclick="sortDataCol(\'' + col + '\')">' + lbl + '</th>';
     const thS = (col, lbl, clr, extra='') =>
         '<th class="p-1 text-center text-[8px] font-normal cursor-pointer select-none"'
-        + ' style="color:' + (dataSort.col===col ? '#3a86ff' : clr) + ';' + extra
-        + '" onclick="sortDataCol(\'' + col + '\')">' + lbl + '</th>';
+        + ' style="' + extra + 'color:' + (dataSort.col===col?'#3a86ff':clr) + '"'
+        + ' onclick="sortDataCol(\'' + col + '\')">' + lbl + '</th>';
 
     const nameLabel = dataMode === 'drivers' ? 'DR' : 'CR';
 
     const groupHead = '<thead>'
-        // Row 1: group headers
         + '<tr style="background:var(--card2);border-bottom:1px solid var(--border)">'
-        + thR('name',   nameLabel, 'text-align:left;padding-left:10px')
-        + thR('price',  '$',       'text-align:center')
-        + thR('pts_r0', 'R0',      'text-align:center;color:var(--muted)')
-        + thR('pts_r1', 'R1',      'text-align:center;color:var(--muted);border-right:2px solid var(--border)')
-        + '<th colspan="2" style="background:rgba(140,10,10,.4);color:#ff8888;font-size:8px;font-weight:bold;'
-        +   'text-align:center;padding:3px;border-left:1px solid var(--border);border-bottom:1px solid var(--border)">'
-        +   '-0.3 &nbsp;&nbsp; -0.1</th>'
-        + '<th colspan="2" style="background:rgba(10,90,50,.4);color:#88ffcc;font-size:8px;font-weight:bold;'
-        +   'text-align:center;padding:3px;border-bottom:1px solid var(--border)">'
-        +   '+0.1 &nbsp;&nbsp; +0.3</th>'
+        + thR('name',   nameLabel, 'text-align:left;padding-left:10px;')
+        + thR('price',  '$',       'text-align:center;')
+        + thR('pts_r0', 'R0',      'text-align:center;')
+        + thR('pts_r1', 'R1',      'text-align:center;border-right:2px solid var(--border);')
+        + '<th colspan="2" style="background:rgba(120,10,10,.4);color:#ff9999;font-size:8px;font-weight:bold;'
+        +   'text-align:center;padding:3px 2px;border-bottom:1px solid var(--border)">'
+        +   '-0.3 &nbsp; -0.1</th>'
+        + '<th colspan="2" style="background:rgba(10,80,40,.4);color:#99ffbb;font-size:8px;font-weight:bold;'
+        +   'text-align:center;padding:3px 2px;border-bottom:1px solid var(--border)">'
+        +   '+0.1 &nbsp; +0.3</th>'
         + '</tr>'
-        // Row 2: individual col headers
         + '<tr style="background:var(--card2);border-bottom:2px solid var(--border)">'
-        + thS('pts_m03', '-0.3', '#ff6b6b', 'border-left:1px solid var(--border)')
-        + thS('pts_m01', '-0.1', '#ffaaaa')
-        + thS('pts_p01', '+0.1', '#74d9d0')
-        + thS('pts_p03', '+0.3', '#2ec4b6')
+        + thS('pts_m03','-0.3','#ff7070')
+        + thS('pts_m01','-0.1','#ffaaaa')
+        + thS('pts_p01','+0.1','#70ffaa')
+        + thS('pts_p03','+0.3','#2ec4b6')
         + '</tr>'
         + '</thead>';
 
-    // Tier divider row
-    const tierHdr = (label, accentCol) =>
-        '<tr style="background:' + accentCol + '22;border-top:2px solid ' + accentCol + '77;border-bottom:1px solid ' + accentCol + '55">'
+    const tierHdr = (label, accent) =>
+        '<tr style="background:' + accent + '22;border-top:2px solid ' + accent + '77;border-bottom:1px solid ' + accent + '55">'
         + '<td colspan="8" style="padding:4px 10px">'
-        + '<span style="color:' + accentCol + ';font-size:8px;font-weight:bold;letter-spacing:.07em;text-transform:uppercase">'
-        + label + '</span>'
-        + '</td></tr>';
+        + '<span style="color:' + accent + ';font-size:8px;font-weight:bold;letter-spacing:.07em;text-transform:uppercase">'
+        + label + '</span></td></tr>';
 
     document.getElementById('data-budget-table').innerHTML =
         '<div style="overflow-x:auto">'
         + '<table class="w-full" style="min-width:400px;border-collapse:collapse">'
-        + groupHead
-        + '<tbody>'
-        + (tierA.length ? tierHdr(tierALabel, '#f4a100') : '')
+        + groupHead + '<tbody>'
+        + (tierA.length ? tierHdr(tierALabel,'#f4a100') : '')
         + buildRows(tierA)
-        + (tierB.length ? tierHdr(tierBLabel, '#3a86ff') : '')
+        + (tierB.length ? tierHdr(tierBLabel,'#3a86ff') : '')
         + buildRows(tierB)
         + '</tbody></table></div>';
 

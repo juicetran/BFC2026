@@ -23,7 +23,7 @@ jobs:
           python -m playwright install chromium
 
       - name: Run Scraper
-        run: python scraper.py
+        run: budget_scraper.py
 
       - name: Push updated data
         run: |

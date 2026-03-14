@@ -1,3 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🏎️ Baby Formula Championship</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --r1:#ff4757;--r2:#ff6b35;--r3:#f7c59f;--r4:#2ec4b6;--r5:#3a86ff;--r6:#c77dff;
+            --gold:#f4a100;--silver:#9a9aaa;--bronze:#cd7f32;
+            --bg:#f0eff4;--card:#ffffff;--card2:#f5f4fa;--border:#e2e0ee;
+            --text:#1a1a2e;--subtext:#6b6b8a;--muted:#a0a0bb;
+        }
+        *{box-sizing:border-box;}
+        body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--text);margin:0;}
+        .fun{font-family:'Boogaloo',cursive;}
+        .rb-text{background:linear-gradient(90deg,var(--r1),var(--r2),#f4a100,var(--r4),var(--r5),var(--r6));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+        .rb-bar{height:3px;background:linear-gradient(90deg,var(--r1),var(--r2),#f4a100,var(--r4),var(--r5),var(--r6));}
+        .rb-border{border:2px solid transparent;background:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(135deg,var(--r1),#f4a100,var(--r4),var(--r5),var(--r6)) border-box;}
+        .page{display:none;animation:fadeSlide .25s ease;}
+        .page.active{display:block;}
+        @keyframes fadeSlide{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+        .nav-btn{cursor:pointer;padding:6px 4px;border-radius:12px;text-align:center;transition:background .15s;}
+        .nav-btn.active{background:#e8e6f5;}
+        .nav-btn .ni{font-size:20px;line-height:1;}
+        .nav-btn .nl{font-size:8px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.06em;}
+        .nav-btn.active .nl{color:var(--subtext);}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+        .card2{background:var(--card2);border:1px solid var(--border);border-radius:12px;}
+        .prow{border-bottom:1px solid var(--border);transition:background .12s;opacity:0;animation:rowIn .35s ease forwards;}
+        .prow:last-child{border-bottom:none;}
+        .prow:active{background:var(--card2);}
+        @keyframes rowIn{to{opacity:1}}
+        select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:9px 10px;border-radius:10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:100%;cursor:pointer;-webkit-appearance:none;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+        .chip{display:inline-block;padding:2px 8px;border-radius:20px;font-size:8px;font-weight:bold;letter-spacing:.07em;text-transform:uppercase;}
+        .jcard{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;border-left:3px solid transparent;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05);}
+        ::-webkit-scrollbar{display:none;}
+        #sync-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:100;padding:6px 16px;font-size:10px;text-align:center;letter-spacing:.06em;}
+        #sync-banner.show{display:block;}
+        #sync-banner.loading{background:#3a86ff22;color:#3a86ff;border-bottom:1px solid #3a86ff44;}
+        #sync-banner.success{background:#2ec4b622;color:#2ec4b6;border-bottom:1px solid #2ec4b644;}
+        #sync-banner.error{background:#ff475722;color:#ff4757;border-bottom:1px solid #ff475744;}
+        .skeleton{background:linear-gradient(90deg,#e8e6f5 25%,#f5f4fa 50%,#e8e6f5 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .team-card-detail{display:none;border-top:1px solid var(--border);padding:10px 14px;}
+        .team-card.open .team-card-detail{display:block;}
+        .team-card.open .team-card-chevron{transform:rotate(180deg);}
+        .team-card-chevron{transition:transform .2s;font-size:10px;color:var(--muted);}
+    </style>
+</head>
+<body>
+<div id="sync-banner"></div>
+<div class="max-w-[448px] mx-auto min-h-screen pb-24">
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-50 bg-[#f0eff4]/96 backdrop-blur border-b border-[#e2e0ee]">
+        <div class="rb-bar"></div>
+        <div class="flex justify-between items-center px-4 py-3">
+            <div>
+                <h1 class="fun text-2xl rb-text leading-none">Baby Formula Championship</h1>
+                <p class="text-[9px] text-[#9090b8] uppercase tracking-widest mt-0.5" id="header-subtitle">2026 Season · Loading…</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="syncAll()" id="sync-btn"
+                    style="background:#f5f4fa;border:1px solid #e2e0ee;border-radius:10px;padding:6px 10px;cursor:pointer;font-size:10px;color:#6b6b8a;font-family:'Share Tech Mono',monospace;transition:all .15s;"
+                    onmouseover="this.style.background='#e8e6f5'" onmouseout="this.style.background='#f5f4fa'">
+                    🔄 Sync
+                </button>
+                <span class="text-3xl">🏎️</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- HOME PAGE -->
+    <div id="page-home" class="page active px-4 pt-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="fun text-xl" style="color:var(--text)">Standings</h2>
+            <div style="position:relative;width:200px;">
+                <select id="standings-round-select" onchange="renderStandings()" style="padding:5px 28px 5px 10px;font-size:10px;border-radius:10px;">
+                    <option value="overall">📊 Overall</option>
+                </select>
+                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+            </div>
+        </div>
+
+        <div class="card overflow-hidden mb-4" id="standings-table">
+            <div class="skeleton" style="height:56px;border-radius:0;margin-bottom:1px;opacity:.5"></div>
+            <div class="skeleton" style="height:56px;border-radius:0;margin-bottom:1px;opacity:.4"></div>
+            <div class="skeleton" style="height:56px;border-radius:0;opacity:.3"></div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 mb-4" id="home-stats">
+            <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
+            <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
+            <div class="card p-3 text-center"><div class="skeleton" style="height:48px;border-radius:10px"></div></div>
+        </div>
+
+        <div id="home-weekly-section" style="display:none">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="fun text-base" style="color:var(--text)" id="home-weekly-title">Latest Round</h3>
+            </div>
+            <div class="card overflow-hidden mb-4" id="home-weekly-table"></div>
+        </div>
+
+        <div class="card p-4" id="home-recap">
+            <h3 class="fun text-base mb-3" style="color:var(--text)">🇦🇺 Australian GP Recap</h3>
+            <div class="space-y-2 text-[11px]" style="color:var(--subtext)">
+                <div class="flex gap-2"><span>🥇</span><span><span style="color:#2ec4b6;font-weight:bold">Russell wins it</span> for Mercedes — anyone with George (2x) absolutely feasted</span></div>
+                <div class="flex gap-2"><span>🥈</span><span><span style="color:#3a86ff;font-weight:bold">Mercedes 1-2</span> — Antonelli P2 on debut season. The silver era is actually back</span></div>
+                <div class="flex gap-2"><span>💥</span><span><span style="color:#ff4757;font-weight:bold">Piastri DNS</span> — crashed on sighting lap before race even started. Cosmically cursed</span></div>
+                <div class="flex gap-2"><span>📉</span><span><span style="color:#ff4757;font-weight:bold">Hadjar -8 pts</span> — DNF + penalty combo. Negative eight. NEGATIVE EIGHT.</span></div>
+                <div class="flex gap-2"><span>🚀</span><span><span style="color:#f4a100;font-weight:bold">Verstappen P6 from P20</span> — came from last after quali crash. 14 overtakes. Unreal</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- H2H PAGE -->
+    <div id="page-h2h" class="page px-4 pt-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="fun text-xl" style="color:var(--text)">H2H Pulse ⚡</h2>
+            <span class="chip" id="h2h-chip" style="background:rgba(58,134,255,.12);color:#3a86ff">—</span>
+        </div>
+        <div class="grid grid-cols-[1fr_20px_1fr] items-center gap-2 mb-3">
+            <select id="h2h-left"  onchange="renderH2H()"></select>
+            <div class="text-center text-xs" style="color:var(--muted)">vs</div>
+            <select id="h2h-right" onchange="renderH2H()"></select>
+        </div>
+        <div style="position:relative;margin-bottom:16px;">
+            <select id="h2h-round-select" onchange="renderH2H()" style="padding:9px 28px 9px 10px;">
+                <option value="overall">📊 Overall Season</option>
+            </select>
+            <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+        </div>
+        <div id="h2h-content"></div>
+    </div>
+
+    <!-- SCHEDULE PAGE -->
+    <div id="page-schedule" class="page px-4 pt-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="fun text-xl" style="color:var(--text)">Schedule 📅</h2>
+            <span class="chip" style="background:rgba(58,134,255,.12);color:#3a86ff">2026 Season</span>
+        </div>
+        <div class="card p-4 mb-4" id="sched-countdown-card">
+            <div class="text-[8px] uppercase tracking-widest mb-1" style="color:var(--muted)">Next Session · Sydney Time</div>
+            <div class="fun text-base mb-0.5" style="color:var(--text)" id="sched-countdown-event">Loading…</div>
+            <div class="font-mono text-2xl font-bold rb-text" id="sched-countdown-timer">--:--:--</div>
+            <div class="text-[9px] mt-1" style="color:var(--subtext)" id="sched-countdown-when"></div>
+        </div>
+        <div style="position:relative;margin-bottom:12px;">
+            <select id="sched-round-select" onchange="renderScheduleRound()" style="padding:9px 28px 9px 10px;"></select>
+            <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+        </div>
+        <div class="card overflow-hidden" id="sched-session-table"></div>
+    </div>
+
+    <!-- DATA PAGE -->
+    <div id="page-data" class="page px-4 pt-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="fun text-xl" style="color:var(--text)">Data 📊</h2>
+            <span class="chip" style="background:rgba(46,196,182,.12);color:#2ec4b6" id="data-freshness-chip">—</span>
+        </div>
+        <div style="position:relative;margin-bottom:12px;">
+            <select id="data-stat-select" onchange="onDataStatChange()" style="padding:9px 28px 9px 10px;">
+                <option value="budget">📉 Budget Stats</option>
+                <option value="fantasy">🏆 Fantasy Prices &amp; Points</option>
+                <option value="teams">👥 League Teams</option>
+            </select>
+            <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+        </div>
+
+        <!-- Budget Stats panel -->
+        <div id="data-budget-panel">
+            <div class="card2 flex items-center gap-2 px-3 py-2 mb-3" style="font-size:9px;color:var(--subtext);">
+                <span>🔗 Source:</span>
+                <a href="https://f1fantasytools.com/budget-builder" target="_blank" rel="noopener" style="color:#3a86ff;text-decoration:none;">f1fantasytools.com/budget-builder</a>
+                <span id="data-sim-label" style="margin-left:auto;color:var(--muted);font-size:8px;white-space:nowrap;flex-shrink:0;"></span>
+            </div>
+            <div class="flex rounded-xl p-1 gap-1 mb-3" style="background:#f5f4fa;border:1px solid #e2e0ee;display:inline-flex;">
+                <button id="data-tab-drivers" onclick="setDataTab('drivers')" class="data-tab-btn px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all" style="background:#ffffff;color:var(--text)">Drivers</button>
+                <button id="data-tab-constructors" onclick="setDataTab('constructors')" class="data-tab-btn px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all" style="color:var(--muted)">Constructors</button>
+            </div>
+            <p class="text-[8px] mb-2 px-1 uppercase tracking-widest" style="color:var(--muted)">Tap column header to sort ↕</p>
+            <div class="card overflow-hidden mb-3" id="data-budget-table-wrap">
+                <div id="data-budget-table">
+                    <div class="skeleton" style="height:40px;border-radius:0;margin-bottom:1px;opacity:.5"></div>
+                    <div class="skeleton" style="height:36px;border-radius:0;margin-bottom:1px;opacity:.4"></div>
+                    <div class="skeleton" style="height:36px;border-radius:0;opacity:.3"></div>
+                </div>
+            </div>
+            <div id="data-budget-error" style="display:none;" class="card2 p-4 text-center mb-3">
+                <div style="font-size:24px;margin-bottom:6px;">⚠️</div>
+                <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Data not available</div>
+                <div class="text-[9px]" style="color:var(--subtext)">Run the scraper to generate <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_budget_data.json</code>.</div>
+            </div>
+        </div>
+
+        <!-- Fantasy Prices & Points panel -->
+        <div id="data-fantasy-panel" style="display:none;">
+            <div class="card2 flex items-center gap-2 px-3 py-2 mb-3" style="font-size:9px;color:var(--subtext);">
+                <span>🔗 fantasy.formula1.com</span>
+                <span id="fantasy-updated-chip" style="margin-left:auto;color:var(--muted);font-size:8px;"></span>
+            </div>
+            <div style="position:relative;margin-bottom:10px;">
+                <select id="fantasy-round-select" onchange="renderFantasyTable()" style="padding:9px 28px 9px 10px;"></select>
+                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+            </div>
+            <div class="flex rounded-xl p-1 gap-1 mb-3" style="background:#f5f4fa;border:1px solid #e2e0ee;display:inline-flex;">
+                <button id="fantasy-tab-drivers" onclick="setFantasyTab('drivers')" class="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all" style="background:#ffffff;color:var(--text)">Drivers</button>
+                <button id="fantasy-tab-constructors" onclick="setFantasyTab('constructors')" class="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all" style="color:var(--muted)">Teams</button>
+            </div>
+            <p class="text-[8px] mb-2 px-1 uppercase tracking-widest" style="color:var(--muted)">Tap column header to sort ↕</p>
+            <div class="card overflow-hidden mb-3"><div id="fantasy-table"></div></div>
+            <div id="fantasy-error" style="display:none;" class="card2 p-4 text-center mb-3">
+                <div style="font-size:22px;margin-bottom:6px;">🔐</div>
+                <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Fantasy data not synced</div>
+                <div class="text-[9px]" style="color:var(--subtext)">Run <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">run_fantasy_sync.bat</code> to pull data.</div>
+            </div>
+        </div>
+
+        <!-- League Teams panel -->
+        <div id="data-teams-panel" style="display:none;">
+            <div class="card2 flex items-center gap-2 px-3 py-2 mb-3" style="font-size:9px;color:var(--subtext);">
+                <span>🏁 Baby Formula Championship · Team Picks</span>
+                <span id="teams-updated-chip" style="margin-left:auto;color:var(--muted);font-size:8px;"></span>
+            </div>
+            <div style="position:relative;margin-bottom:10px;">
+                <select id="teams-round-select" onchange="renderTeamsPanel()" style="padding:9px 28px 9px 10px;"></select>
+                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+            </div>
+            <div id="teams-player-wrap" style="position:relative;margin-bottom:12px;display:none;">
+                <select id="teams-player-select" onchange="renderTeamsPanel()" style="padding:9px 28px 9px 10px;"></select>
+                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
+            </div>
+            <div id="teams-summary" class="grid grid-cols-3 gap-2 mb-3"></div>
+            <div class="card overflow-hidden mb-3"><div id="teams-picks-table"></div></div>
+            <div id="teams-error" style="display:none;" class="card2 p-4 text-center mb-3">
+                <div style="font-size:22px;margin-bottom:6px;">🔐</div>
+                <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Team data not synced</div>
+                <div class="text-[9px]" style="color:var(--subtext)">Run <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">run_fantasy_sync.bat</code> to pull league data.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav class="fixed bottom-0 left-0 right-0 flex justify-center z-50">
+        <div class="w-full max-w-[448px] backdrop-blur border-t" style="background:rgba(240,239,244,.96);border-color:#e2e0ee">
+            <div class="rb-bar"></div>
+            <div class="grid grid-cols-4 gap-1 px-2 py-2">
+                <div class="nav-btn active" onclick="navigate('home')"     id="nav-home"><div class="ni">🏠</div><div class="nl">Home</div></div>
+                <div class="nav-btn"        onclick="navigate('h2h')"      id="nav-h2h"><div class="ni">⚡</div><div class="nl">H2H</div></div>
+                <div class="nav-btn"        onclick="navigate('schedule')" id="nav-schedule"><div class="ni">📅</div><div class="nl">Schedule</div></div>
+                <div class="nav-btn"        onclick="navigate('data')"     id="nav-data"><div class="ni">📊</div><div class="nl">Data</div></div>
+            </div>
+        </div>
+    </nav>
+</div>
+
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // PLAYER CONFIG — static fallback metadata
@@ -631,6 +891,104 @@ document.addEventListener('DOMContentLoaded', () => {
     syncAll();
     populateScheduleDropdown();
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// DATA PAGE — Budget Stats (reads f1_budget_data.json if present)
+// ═══════════════════════════════════════════════════════════════════
+let dataMode = 'drivers';
+let dataSort = { col:'price', dir:-1 };
+
+function setDataTab(mode) {
+    dataMode = mode;
+    ['drivers','constructors'].forEach(t => {
+        const btn = document.getElementById(`data-tab-${t}`);
+        if (!btn) return;
+        if (t === mode) { btn.style.background='#ffffff'; btn.style.color='var(--text)'; }
+        else            { btn.style.background='';        btn.style.color='var(--muted)'; }
+    });
+    renderBudgetTable();
+}
+
+function sortDataCol(col) {
+    if (dataSort.col === col) dataSort.dir *= -1;
+    else { dataSort.col = col; dataSort.dir = -1; }
+    renderBudgetTable();
+}
+
+async function loadF1Data() {
+    try {
+        const res = await fetch('./f1_budget_data.json', { cache:'no-cache' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        F1_DATA = await res.json();
+        renderBudgetTable();
+        const chip = document.getElementById('data-freshness-chip');
+        if (chip) chip.textContent = F1_DATA.last_updated ? F1_DATA.last_updated.split(' ')[0] : 'Loaded';
+    } catch(e) {
+        const t = document.getElementById('data-budget-table');
+        const err = document.getElementById('data-budget-error');
+        if (t) t.style.display = 'none';
+        if (err) err.style.display = '';
+    }
+}
+
+function parseNum(v) {
+    if (v==null) return -Infinity;
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+    return isNaN(n) ? -Infinity : n;
+}
+
+function renderBudgetTable() {
+    if (!F1_DATA) return;
+    const raw = dataMode === 'drivers' ? (F1_DATA.drivers||[]) : (F1_DATA.constructors||[]);
+    if (!raw.length) {
+        const err = document.getElementById('data-budget-error');
+        if (err) err.style.display = '';
+        return;
+    }
+    const sorted = [...raw].sort((a,b) => {
+        if (dataSort.col==='name') return dataSort.dir*String(a.name||'').localeCompare(String(b.name||''));
+        if (dataSort.col==='price') return dataSort.dir*((parseFloat(a.price)||0)-(parseFloat(b.price)||0));
+        return 0;
+    });
+    const fmtPts = (val) => {
+        if (!val||val==='-'||val==='—') return '<span style="color:var(--muted)">—</span>';
+        const n=parseFloat(val);
+        const c=n>0?'#2ec4b6':n<0?'#ff4757':'var(--subtext)';
+        return `<span style="font-size:10px;color:${c}">${val}</span>`;
+    };
+    const th = (col, label) => {
+        const active = dataSort.col === col;
+        const arrow  = active ? (dataSort.dir===-1?'↓':'↑') : '↕';
+        return `<th class="p-2 text-center cursor-pointer select-none text-[8px] uppercase tracking-wider font-normal"
+                    style="color:${active?'#3a86ff':'var(--muted)'}" onclick="sortDataCol('${col}')">
+                    ${label}<span style="opacity:.7;margin-left:2px">${arrow}</span></th>`;
+    };
+    const rows = sorted.map((d,i) => {
+        const tc = TEAM_TAG_COLORS[d.team_tag||d.short_name||''] || '#9090b8';
+        return `<tr class="border-b last:border-0" style="border-color:var(--border)"
+                    onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
+            <td class="p-2 text-center font-mono text-[9px]" style="color:var(--muted)">${i+1}</td>
+            <td class="p-3">
+                <div class="flex items-center gap-2">
+                    <span style="background:${tc}22;color:${tc};font-size:9px;font-weight:bold;padding:2px 6px;border-radius:6px;">${d.short_name||d.name||'—'}</span>
+                    <span class="text-[10px]" style="color:var(--text)">${d.full_name||d.name||''}</span>
+                </div>
+                ${dataMode==='drivers'&&d.team?`<div class="text-[8px] mt-0.5 ml-9" style="color:${tc}">${d.team}</div>`:''}
+            </td>
+            <td class="p-2 text-center font-mono text-[10px]" style="color:var(--subtext)">$${d.price||'—'}M</td>
+            <td class="p-2 text-center">${fmtPts(d.pts||d.total_points)}</td>
+        </tr>`;
+    }).join('');
+    const el = document.getElementById('data-budget-table');
+    if (el) el.innerHTML = `<div style="overflow-x:auto"><table class="w-full" style="min-width:260px">
+        <thead><tr class="border-b" style="background:var(--card2);border-color:var(--border)">
+            <th class="p-2 w-6 text-[8px]" style="color:var(--muted)">#</th>
+            ${th('name','Name')}
+            ${th('price','Price')}
+            ${th('pts','Pts')}
+        </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
 </script>
 </body>
 </html>

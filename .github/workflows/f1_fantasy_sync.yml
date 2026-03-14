@@ -1,8 +1,8 @@
-name: F1 Fantasy Data Sync
+name: Daily F1 Fantasy Stat Sync - F1 Fantasy (Official)
 
 on:
   schedule:
-    - cron: '0 */3 * * *'   # every 3 hours
+    - cron: '0 0 * * *'   # Every day at midnight UTC (10:00 AM AEST / 11:00 AM AEDT)
   workflow_dispatch:         # manual trigger from Actions tab
 
 jobs:

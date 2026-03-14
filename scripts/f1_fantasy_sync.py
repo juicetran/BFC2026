@@ -52,11 +52,26 @@ PLAYER_MAP = {
 # ─────────────────────────────────────────────────────────────────
 async def authenticate(session: aiohttp.ClientSession) -> str:
     """Returns a Bearer token."""
-    payload = {"Login": EMAIL, "Password": PASSWORD}
+    payload = {
+        "Login":               EMAIL,
+        "Password":            PASSWORD,
+        "DistributionChannel": "d861e38f-05ea-4063-8776-a7e2b6d885a4",  # required field
+    }
     headers = {
-        "Content-Type":  "application/json",
-        "apikey":        "fNpmSJRnXLHe0l3W",   # public API key from postman docs
-        "User-Agent":    "F1FantasySync/1.0",
+        # Must match a real browser request — F1 API rejects bot-like requests
+        "Content-Type":     "application/json",
+        "apikey":           "fCUCjWrKPu9ylJwRAv8BpGLEgiAuThx7",
+        "authority":        "api.formula1.com",
+        "origin":           "https://account.formula1.com",
+        "referer":          "https://account.formula1.com/",
+        "user-agent":       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "accept":           "application/json, text/javascript, */*; q=0.01",
+        "accept-language":  "en-US,en;q=0.9",
+        "sec-fetch-site":   "same-site",
+        "sec-fetch-mode":   "cors",
+        "sec-fetch-dest":   "empty",
+        "pragma":           "no-cache",
+        "cache-control":    "no-cache",
     }
     async with session.post(AUTH_URL, json=payload, headers=headers) as r:
         if r.status != 200:

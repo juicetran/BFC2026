@@ -1,0 +1,208 @@
+{
+  "season": "2026",
+  "schedule": [
+    {
+      "round": 1,
+      "gp": "Australian Grand Prix",
+      "location": "Melbourne",
+      "circuit": "Albert Park Circuit",
+      "type": "traditional",
+      "date": "Mar 08",
+      "full_dates": "Mar 06-08"
+    },
+    {
+      "round": 2,
+      "gp": "Chinese Grand Prix",
+      "location": "Shanghai",
+      "circuit": "Shanghai International Circuit",
+      "type": "sprint",
+      "date": "Mar 15",
+      "full_dates": "Mar 13-15"
+    },
+    {
+      "round": 3,
+      "gp": "Japanese Grand Prix",
+      "location": "Suzuka",
+      "circuit": "Suzuka Circuit",
+      "type": "traditional",
+      "date": "Mar 29",
+      "full_dates": "Mar 27-29"
+    },
+    {
+      "round": 4,
+      "gp": "Bahrain Grand Prix",
+      "location": "Sakhir",
+      "circuit": "Bahrain International Circuit",
+      "type": "traditional",
+      "date": "Apr 12",
+      "full_dates": "Apr 10-12"
+    },
+    {
+      "round": 5,
+      "gp": "Saudi Arabian Grand Prix",
+      "location": "Jeddah",
+      "circuit": "Jeddah Corniche Circuit",
+      "type": "traditional",
+      "date": "Apr 19",
+      "full_dates": "Apr 17-19"
+    },
+    {
+      "round": 6,
+      "gp": "Miami Grand Prix",
+      "location": "Miami",
+      "circuit": "Miami International Autodrome",
+      "type": "sprint",
+      "date": "May 03",
+      "full_dates": "May 01-03"
+    },
+    {
+      "round": 7,
+      "gp": "Canadian Grand Prix",
+      "location": "Montreal",
+      "circuit": "Circuit Gilles Villeneuve",
+      "type": "sprint",
+      "date": "May 24",
+      "full_dates": "May 22-24"
+    },
+    {
+      "round": 8,
+      "gp": "Monaco Grand Prix",
+      "location": "Monte Carlo",
+      "circuit": "Circuit de Monaco",
+      "type": "traditional",
+      "date": "Jun 07",
+      "full_dates": "Jun 05-07"
+    },
+    {
+      "round": 9,
+      "gp": "Barcelona-Catalunya Grand Prix",
+      "location": "Barcelona",
+      "circuit": "Circuit de Barcelona-Catalunya",
+      "type": "traditional",
+      "date": "Jun 14",
+      "full_dates": "Jun 12-14"
+    },
+    {
+      "round": 10,
+      "gp": "Austrian Grand Prix",
+      "location": "Spielberg",
+      "circuit": "Red Bull Ring",
+      "type": "traditional",
+      "date": "Jun 28",
+      "full_dates": "Jun 26-28"
+    },
+    {
+      "round": 11,
+      "gp": "British Grand Prix",
+      "location": "Silverstone",
+      "circuit": "Silverstone Circuit",
+      "type": "sprint",
+      "date": "Jul 05",
+      "full_dates": "Jul 03-05"
+    },
+    {
+      "round": 12,
+      "gp": "Belgian Grand Prix",
+      "location": "Spa-Francorchamps",
+      "circuit": "Circuit de Spa-Francorchamps",
+      "type": "traditional",
+      "date": "Jul 19",
+      "full_dates": "Jul 17-19"
+    },
+    {
+      "round": 13,
+      "gp": "Hungarian Grand Prix",
+      "location": "Budapest",
+      "circuit": "Hungaroring",
+      "type": "traditional",
+      "date": "Jul 26",
+      "full_dates": "Jul 24-26"
+    },
+    {
+      "round": 14,
+      "gp": "Dutch Grand Prix",
+      "location": "Zandvoort",
+      "circuit": "Circuit Zandvoort",
+      "type": "sprint",
+      "date": "Aug 23",
+      "full_dates": "Aug 21-23"
+    },
+    {
+      "round": 15,
+      "gp": "Italian Grand Prix",
+      "location": "Monza",
+      "circuit": "Autodromo Nazionale Monza",
+      "type": "traditional",
+      "date": "Sep 06",
+      "full_dates": "Sep 04-06"
+    },
+    {
+      "round": 16,
+      "gp": "Spanish Grand Prix",
+      "location": "Madrid",
+      "circuit": "Madrid Street Circuit",
+      "type": "traditional",
+      "date": "Sep 13",
+      "full_dates": "Sep 11-13"
+    },
+    {
+      "round": 17,
+      "gp": "Azerbaijan Grand Prix",
+      "location": "Baku",
+      "circuit": "Baku City Circuit",
+      "type": "traditional",
+      "date": "Sep 26",
+      "full_dates": "Sep 24-26"
+    },
+    {
+      "round": 18,
+      "gp": "Singapore Grand Prix",
+      "location": "Marina Bay",
+      "circuit": "Marina Bay Street Circuit",
+      "type": "sprint",
+      "date": "Oct 11",
+      "full_dates": "Oct 09-11"
+    },
+    {
+      "round": 19,
+      "gp": "United States Grand Prix",
+      "location": "Austin",
+      "circuit": "Circuit of the Americas",
+      "type": "traditional",
+      "date": "Oct 25",
+      "full_dates": "Oct 23-25"
+    },
+    {
+      "round": 20,
+      "gp": "Mexico City Grand Prix",
+      "location": "Mexico City",
+      "circuit": "Autódromo Hermanos Rodríguez",
+      "type": "traditional",
+      "date": "Nov 01",
+      "full_dates": "Oct 30-Nov 01"
+    },
+    {
+      "round": 21,
+      "gp": "São Paulo Grand Prix",
+      "location": "São Paulo",
+      "circuit": "Autódromo José Carlos Pace",
+      "type": "traditional",
+      "date": "Nov 08",
+      "full_dates": "Nov 06-08"
+    },
+    {
+      "round": 22,
+      "gp": "Las Vegas Grand Prix",
+      "location": "Las Vegas",
+      "circuit": "Las Vegas Strip Circuit",
+      "type": "traditional",
+      "date": "Nov 21",
+      "full_dates": "Nov 19-21"
+    },
+    {
+      "round": 23,
+      "gp": "Qatar Grand Prix",
+      "location": "Lusail",
+      "circuit": "Lusail International Circuit",
+      "type": "traditional",
+      "

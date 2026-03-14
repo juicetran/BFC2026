@@ -38,31 +38,74 @@ def clean_val(raw: str) -> str:
 
 async def scrape_table(table, table_index: int) -> list[dict]:
     """
-    Scrape one <table> element.
-    Returns list of entry dicts, each with a 'tier' key ('A' or 'B').
+    Scrape one <table> (index 0 = Drivers, index 1 = Constructors).
 
-    Actual Budget Builder column layout (10 cells per data row):
-      0  : Tag          e.g. "RUS"
-      1  : Price        e.g. "27.7"
-      2  : Pts          season rolling total (may be "-" mid-week)
-      3  : Pts R1       points from most recent completed race
-      4  : xPts         expected points
-      5  : -0.3 Odds    e.g. "10% (≤-6)"
-      6  : -0.1 Odds    e.g. "1% (-5)"
-      7  : +0.1 Odds    e.g. "2% (11)"
-      8  : +0.3 Odds    e.g. "87% (28)"
-      9  : R2 xΔ$       e.g. "+0.23"
+    Reads <thead> first to detect actual column positions, so it works
+    regardless of how many columns the site is currently showing.
+
+    Expected column names the site uses:
+        DR / CR       → name
+        $             → price
+        Pts  (no R)   → pts  (season total, R0)
+        Pts R1        → pts_r1
+        xPts          → xpts
+        -0.3          → odds_m03
+        -0.1          → odds_m01
+        +0.1          → odds_p01
+        +0.3          → odds_p03
+        xΔ$ / R2      → r2_change
     """
-    entries = []
-    current_tier       = None
-    current_tier_label = None   # full label e.g. "Tier A (>=18.5M)"
+    entries        = []
+    current_tier   = None
+    current_tier_label = None
 
+    # ── Detect column positions from <thead> ──────────────────────
+    col_map = {}  # field_name -> column index
+    try:
+        all_header_rows = await table.locator("thead tr").all()
+        # Use the last header row — it has the most granular labels
+        for hrow in all_header_rows:
+            cells = await hrow.locator("th, td").all()
+            for i, cell in enumerate(cells):
+                raw = (await cell.inner_text()).strip()
+                t   = raw.lower().replace("\n", " ").strip()
+                if t in ("dr", "cr"):                              col_map["name"]      = i
+                elif t == "$":                                     col_map["price"]     = i
+                elif t in ("pts", "r0", "pts r0"):                col_map.setdefault("pts", i)
+                elif "r1" in t and "pts" in t:                    col_map["pts_r1"]    = i
+                elif "xpts" in t or t == "r2 xpts" or (t.startswith("x") and "pt" in t):
+                    col_map["xpts"] = i
+                elif "-0.3" in t or "−0.3" in t:                  col_map["odds_m03"]  = i
+                elif "-0.1" in t or "−0.1" in t:                  col_map["odds_m01"]  = i
+                elif "+0.1" in t:                                  col_map["odds_p01"]  = i
+                elif "+0.3" in t:                                  col_map["odds_p03"]  = i
+                elif "xδ" in t or "xΔ" in raw or ("r2" in t and "x" in t):
+                    col_map["r2_change"] = i
+
+        print(f"  📋  Table {table_index} column map: {col_map}")
+    except Exception as e:
+        print(f"  ⚠️  Header detection failed: {e}")
+
+    # Fallback to known 10-column layout if detection got < 4 fields
+    if len(col_map) < 4:
+        print("  ℹ️  Falling back to default 10-col layout")
+        col_map = {
+            "name": 0, "price": 1, "pts": 2, "pts_r1": 3, "xpts": 4,
+            "odds_m03": 5, "odds_m01": 6, "odds_p01": 7, "odds_p03": 8,
+            "r2_change": 9,
+        }
+
+    def pick(texts: list[str], key: str, default: str = "") -> str:
+        idx = col_map.get(key)
+        return texts[idx] if idx is not None and idx < len(texts) else default
+
+    # ── Scrape body rows ──────────────────────────────────────────
     rows = await table.locator("tbody tr").all()
     for row in rows:
         cells = await row.locator("td").all()
-        texts = [(await cell.inner_text()).strip() for cell in cells]
+        texts = [(await c.inner_text()).strip() for c in cells]
 
-        # ── Tier header row: single cell spanning all columns ──
+        # Tier header — single cell spanning all cols
         if len(texts) == 1:
             m = re.search(r"Tier\s+([AB])", texts[0], re.IGNORECASE)
             if m:
@@ -70,43 +113,38 @@ async def scrape_table(table, table_index: int) -> list[dict]:
                 current_tier_label = texts[0].strip()
             continue
 
-        # ── Need at least 10 columns for a data row ──
-        if len(texts) < 10:
+        # Need at least 6 cells for a data row
+        if len(texts) < 6:
             continue
 
-        tag       = texts[0]
-        price     = clean_val(texts[1])
-        pts       = texts[2]      # season rolling total (or "-")
-        pts_r1    = texts[3]      # most recent race pts
-        xpts      = texts[4]      # expected pts
-        odds_m03  = texts[5]      # -0.3 odds  "10% (≤-6)"
-        odds_m01  = texts[6]      # -0.1 odds
-        odds_p01  = texts[7]      # +0.1 odds
-        odds_p03  = texts[8]      # +0.3 odds
-        r2_change = texts[9]      # R2 xΔ$  "+0.23"
+        tag = pick(texts, "name") or texts[0]
 
-        # Skip blank or column-header placeholder rows
-        if not tag or tag in ("-", "DR", "CR", "Pts", "xPts", "$"):
+        # Skip column-header ghost rows
+        if not tag or tag in ("-", "DR", "CR", "Pts", "xPts", "$", "R0", "R1", "R2"):
             continue
+
+        odds_m03  = pick(texts, "odds_m03")
+        odds_m01  = pick(texts, "odds_m01")
+        odds_p01  = pick(texts, "odds_p01")
+        odds_p03  = pick(texts, "odds_p03")
 
         entry = {
             "name":         tag,
             "tier":         current_tier,
             "tier_label":   current_tier_label,
-            "price":        price,
-            "pts":          pts,
-            "pts_r1":       pts_r1,
-            "xpts":         xpts,
+            "price":        clean_val(pick(texts, "price")),
+            "pts":          pick(texts, "pts"),
+            "pts_r1":       pick(texts, "pts_r1"),
+            "xpts":         pick(texts, "xpts"),
             "odds_m03":     odds_m03,
             "odds_m01":     odds_m01,
             "odds_p01":     odds_p01,
             "odds_p03":     odds_p03,
-            # Pre-computed % ints for easy frontend sorting
             "odds_m03_pct": parse_pct(odds_m03),
             "odds_m01_pct": parse_pct(odds_m01),
             "odds_p01_pct": parse_pct(odds_p01),
             "odds_p03_pct": parse_pct(odds_p03),
-            "r2_change":    r2_change,
+            "r2_change":    pick(texts, "r2_change"),
         }
         entries.append(entry)
 
@@ -164,12 +202,20 @@ async def run_scraper():
 
             # If we got nothing, print debug rows to diagnose column layout changes
             if d_count == 0:
-                print("  ⚠️  No driver rows — printing first 4 rows for diagnosis:")
+                print("  ⚠️  No driver rows — printing thead + first 4 tbody rows:")
+                try:
+                    hrows = await tables[0].locator("thead tr").all()
+                    for i, hr in enumerate(hrows):
+                        ths = await hr.locator("th, td").all()
+                        htexts = [(await t.inner_text()).strip() for t in ths]
+                        print(f"     thead row {i} ({len(htexts)} cols): {htexts}")
+                except Exception as he:
+                    print(f"     Could not read thead: {he}")
                 rows = await tables[0].locator("tbody tr").all()
                 for i, row in enumerate(rows[:4]):
                     cells = await row.locator("td").all()
                     texts = [(await c.inner_text()).strip() for c in cells]
-                    print(f"     Row {i} ({len(texts)} cols): {texts}")
+                    print(f"     tbody row {i} ({len(texts)} cols): {texts}")
 
         except Exception as e:
             print(f"Scraper error: {e}")

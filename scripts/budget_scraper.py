@@ -4,124 +4,157 @@ import re
 from datetime import datetime
 from playwright.async_api import async_playwright
 
-SKIP_TAGS = {"-", "DR", "CR", "Pts", "xPts", "$", "R0", "R1", "R2",
-             "Odds (pts)", "Odds(pts)", "xΔ$", ""}
+# ─────────────────────────────────────────────────────────────────
+# f1fantasytools.com/budget-builder — "Required Points" view
+#
+# This scraper is designed to be SEASON-RESILIENT:
+#   - Columns grow as races complete (R0, R1, R2 … Rn)
+#   - Price-change labels differ per tier (Tier A: ±0.3/±0.1,
+#     Tier B: ±0.6/±0.2)
+#   - We detect ALL columns dynamically from the tier header row
+#     and the DR/CR subheader row, so adding new race columns
+#     never breaks anything.
+#
+# Data model stored per entry:
+#   name, tier, tier_label, price,
+#   race_pts: { "R0": "-", "R1": "50", "R2": "32", ... }  ← grows each race
+#   req_pts:  { "-0.3": "≤-17", "-0.1": "-16", "+0.1": "1", "+0.3": "17" }
+#   price_changes: ["-0.3", "-0.1", "+0.1", "+0.3"]       ← from tier header
+# ─────────────────────────────────────────────────────────────────
+
+DRIVER_TAGS = {
+    "VER","NOR","PIA","RUS","ANT","LEC","HAM","ALO","STR","GAS","COL",
+    "SAI","ALB","BEA","OCO","LAW","HUL","BOT","HAD","BOR","LIN","PER"
+}
+CONSTRUCTOR_TAGS = {
+    "MER","FER","RED","MCL","AMR","ALP","WIL","HAA","AUD","VRB","CAD","AST"
+}
 
 
 def clean_price(raw: str) -> str:
     return raw.replace("$", "").strip()
 
 
-async def set_required_points_view(page) -> None:
-    """Select 'Required Points' from the dropdown."""
-    try:
-        # Try the visible dropdown
-        await page.wait_for_selector("select, [role='listbox'], button", timeout=5000)
-        # Look for a select with Required Points option
-        selects = await page.locator("select").all()
-        for sel in selects:
-            opts = await sel.locator("option").all()
-            for opt in opts:
-                txt = (await opt.inner_text()).strip()
-                if "required" in txt.lower():
-                    await sel.select_option(label=txt)
-                    print(f"  ✅ Selected: {txt}")
-                    await page.wait_for_timeout(1000)
-                    return
-        # Fallback: click dropdown button and select
-        btns = await page.locator("button").all()
-        for btn in btns:
-            txt = (await btn.inner_text()).strip()
-            if "required" in txt.lower() or "points" in txt.lower():
-                await btn.click()
-                await page.wait_for_timeout(500)
-                return
-    except Exception as e:
-        print(f"  ⚠️  Could not set Required Points view: {e}")
+def is_round_label(t: str) -> bool:
+    """True for column headers like R0, R1, R2 … R24."""
+    return bool(re.match(r'^R\d+$', t.strip()))
 
 
-async def scrape_one_table(table) -> tuple[str, list[dict]]:
+def is_price_change(t: str) -> bool:
+    """True for values like -0.3, -0.1, +0.1, +0.3, -0.6, +0.6 etc."""
+    return bool(re.match(r'^[+\-]\d+\.\d+$', t.strip()))
+
+
+async def identify_and_scrape(table) -> tuple[str | None, list[dict]]:
     """
-    Scrape one table. Returns (table_type, entries) where
-    table_type is 'drivers' or 'constructors' based on DR/CR header.
-    
-    Column layout (Required Points view):
-      DR/CR | $ | R0 Pts | R1 Pts | -0.3 Pts | -0.1 Pts | +0.1 Pts | +0.3 Pts
+    Fully dynamic column detection — works regardless of how many
+    race-points columns (R0, R1, R2 …) have been added so far.
+
+    Per-tier state (reset each time a new tier header row is seen):
+      col_map: maps column index → field name
+        - index 0        → "name"  (tag)
+        - index 1        → "price" ($)
+        - indices 2..N   → round labels  "R0", "R1", "R2" … (from tier header)
+        - indices N+1..M → price-change labels  "-0.3", "-0.1", "+0.1", "+0.3"
+                           (also from tier header)
     """
-    entries = []
-    current_tier = None
-    current_tier_label = None
-    table_type = None
+    table_type        = None
+    current_tier      = None
+    current_tier_label= None
+    current_col_map   = {}   # col_idx -> field_name
+    current_pc_labels = []   # e.g. ["-0.3", "-0.1", "+0.1", "+0.3"]
+    entries           = []
 
     all_rows = await table.locator("tr").all()
 
     for row in all_rows:
         cells = await row.locator("td, th").all()
         texts = [(await c.inner_text()).strip() for c in cells]
+        # Flatten any newlines inside cells
+        texts = [re.sub(r'\s+', ' ', t).strip() for t in texts]
         if not texts:
             continue
 
-        joined = " ".join(texts)
+        t0 = texts[0]
 
-        # ── Detect table type from DR/CR header ──────────────────
-        if "DR" in texts and "$" in texts:
-            table_type = "drivers"
-            continue
-        if "CR" in texts and "$" in texts:
-            table_type = "constructors"
-            continue
+        # ── Tier group header row ────────────────────────────────
+        # e.g. ["Tier A (>=18.5M)", "R0", "R1", "-0.3", "-0.1", "+0.1", "+0.3"]
+        # or later in season: ["Tier A...", "R0","R1","R2","R3", "-0.3","-0.1","+0.1","+0.3"]
+        tier_m = re.search(r'Tier\s+([AB])', t0, re.IGNORECASE)
+        if tier_m:
+            current_tier        = tier_m.group(1).upper()
+            current_tier_label  = t0
+            current_col_map     = {}
+            current_pc_labels   = []
 
-        # ── Tier header (single spanning cell) ──────────────────
-        if len(texts) == 1:
-            m = re.search(r"Tier\s+([AB])", texts[0], re.IGNORECASE)
-            if m:
-                current_tier = m.group(1).upper()
-                current_tier_label = texts[0].strip()
-            continue
+            # col 0 = tag (DR/CR), col 1 = $ — always fixed
+            # Starting from col 2: scan for Rn labels then price-change labels
+            round_cols = []
+            pc_cols    = []
+            for i, t in enumerate(texts[2:], start=2):
+                if is_round_label(t):
+                    round_cols.append((i, t))
+                elif is_price_change(t):
+                    pc_cols.append((i, t))
 
-        # ── Group header row: "Tier A (>=18.5M) | R0 | R1 | -0.3 | ..." ─
-        # These rows have the tier label + column group names
-        if texts and re.search(r"Tier\s+[AB]", texts[0], re.IGNORECASE):
-            m = re.search(r"Tier\s+([AB])", texts[0], re.IGNORECASE)
-            if m:
-                current_tier = m.group(1).upper()
-                current_tier_label = texts[0].strip()
-            continue
+            current_col_map[0] = "name"
+            current_col_map[1] = "price"
+            for idx, lbl in round_cols:
+                current_col_map[idx] = lbl          # e.g. "R0", "R1", "R2"
+            for idx, lbl in pc_cols:
+                current_col_map[idx] = lbl          # e.g. "-0.3", "+0.1"
+            current_pc_labels = [lbl for _, lbl in pc_cols]
 
-        # ── Skip rows with fewer than 4 cells ───────────────────
-        if len(texts) < 4:
-            continue
-
-        # ── Skip pure header/label rows ─────────────────────────
-        # A data row always starts with a 2-3 char driver tag or constructor tag
-        tag = texts[0].strip()
-        if not tag or tag in SKIP_TAGS:
-            continue
-        # Skip if it looks like a header row (all entries are labels)
-        if tag in ("DR", "CR", "Pts", "R0", "R1", "-0.3", "-0.1", "+0.1", "+0.3"):
-            continue
-        # Tags are short codes like RUS, ANT, MER, VRB etc
-        if len(tag) > 5 or not re.match(r'^[A-Z]{2,5}$', tag):
+            print(f"  Tier {current_tier}: col_map={current_col_map}, pc_labels={current_pc_labels}")
             continue
 
-        # ── Data row — columns are positional ───────────────────
-        # 0: tag, 1: price, 2: R0 pts, 3: R1 pts,
-        # 4: -0.3 req, 5: -0.1 req, 6: +0.1 req, 7: +0.3 req
-        def g(i, default=""):
-            return texts[i].strip() if i < len(texts) else default
+        # ── Column sub-header row (DR/CR | $ | Pts | Pts | …) ───
+        if t0 in ("DR", "CR"):
+            table_type = "drivers" if t0 == "DR" else "constructors"
+            continue
 
-        entries.append({
-            "name":       tag,
-            "tier":       current_tier,
-            "tier_label": current_tier_label,
-            "price":      clean_price(g(1)),
-            "pts_r0":     g(2),   # season total (R0)
-            "pts_r1":     g(3),   # last race (R1)
-            "pts_m03":    g(4),   # required for -$0.3
-            "pts_m01":    g(5),   # required for -$0.1
-            "pts_p01":    g(6),   # required for +$0.1
-            "pts_p03":    g(7),   # required for +$0.3
-        })
+        # ── Skip short rows ──────────────────────────────────────
+        if len(texts) < 3:
+            continue
+
+        # ── Data row ─────────────────────────────────────────────
+        tag = t0
+        if not re.match(r'^[A-Z]{2,5}$', tag):
+            continue
+        if tag not in DRIVER_TAGS and tag not in CONSTRUCTOR_TAGS:
+            continue
+
+        # Build entry using col_map for maximum resilience
+        entry = {
+            "name":          tag,
+            "tier":          current_tier,
+            "tier_label":    current_tier_label,
+            "price_changes": list(current_pc_labels),
+            "price":         clean_price(texts[1]) if len(texts) > 1 else "",
+            "race_pts":      {},   # { "R0": "50", "R1": "32", … }
+            "req_pts":       {},   # { "-0.3": "≤-17", "+0.1": "1", … }
+        }
+
+        for col_idx, field in current_col_map.items():
+            if col_idx >= len(texts):
+                continue
+            val = texts[col_idx]
+            if field in ("name", "price"):
+                continue
+            elif is_round_label(field):
+                entry["race_pts"][field] = val
+            elif is_price_change(field):
+                entry["req_pts"][field] = val
+
+        entries.append(entry)
+
+    # Guess type from tags if not detected
+    if table_type is None and entries:
+        tags   = {e["name"] for e in entries}
+        d_hits = len(tags & DRIVER_TAGS)
+        c_hits = len(tags & CONSTRUCTOR_TAGS)
+        table_type = "drivers" if d_hits >= c_hits else "constructors"
+        print(f"  ⚠️  Table type guessed: {table_type} (d={d_hits}, c={c_hits})")
 
     return table_type, entries
 
@@ -149,57 +182,62 @@ async def run_scraper():
             await page.wait_for_selector("table", timeout=30_000)
             print("  ✅ Page loaded")
 
-            # Set Required Points view
-            await set_required_points_view(page)
-            await page.wait_for_timeout(1500)
+            # ── Select "Required Points" view ────────────────────
+            try:
+                for sel in await page.locator("select").all():
+                    for opt in await sel.locator("option").all():
+                        txt = (await opt.inner_text()).strip()
+                        if "required" in txt.lower():
+                            await sel.select_option(label=txt)
+                            print(f"  ✅ View set to: {txt}")
+                            await page.wait_for_timeout(1200)
+                            break
+            except Exception as e:
+                print(f"  ⚠️  Dropdown: {e}")
 
-            # Find all tables and identify drivers vs constructors
+            await page.wait_for_timeout(800)
+
+            # ── Scrape all tables ────────────────────────────────
             tables = await page.locator("table").all()
             print(f"  Found {len(tables)} table(s)")
 
-            drivers_entries = []
-            constructors_entries = []
+            drivers_list      = []
+            constructors_list = []
 
             for ti, table in enumerate(tables):
-                # Dump first few rows to understand structure
                 rows = await table.locator("tr").all()
                 print(f"\n  === Table {ti} ({len(rows)} rows) ===")
-                for i, row in enumerate(rows[:5]):
+                for i, row in enumerate(rows[:6]):
                     cells = await row.locator("td, th").all()
-                    txts = [(await c.inner_text()).strip() for c in cells]
+                    txts  = [(await c.inner_text()).strip() for c in cells]
                     print(f"    row {i}: {txts}")
 
-                table_type, entries = await scrape_one_table(table)
-                print(f"  Table {ti}: type={table_type}, entries={len(entries)}")
+                ttype, entries = await identify_and_scrape(table)
+                print(f"  → type={ttype}, entries={len(entries)}")
 
-                if table_type == "drivers":
-                    drivers_entries.extend(entries)
-                elif table_type == "constructors":
-                    constructors_entries.extend(entries)
-                else:
-                    # Try to guess from content
-                    tags = [e["name"] for e in entries]
-                    driver_tags = {"VER","NOR","PIA","RUS","ANT","LEC","HAM","ALO",
-                                   "STR","GAS","COL","SAI","ALB","BEA","OCO","LAW",
-                                   "HUL","BOT","HAD","BOR","LIN","PER"}
-                    constr_tags = {"MER","FER","RED","MCL","AMR","ALP","WIL",
-                                   "HAA","AUD","VRB","CAD","AST"}
-                    d_hits = sum(1 for t in tags if t in driver_tags)
-                    c_hits = sum(1 for t in tags if t in constr_tags)
-                    print(f"    Guessing: driver_hits={d_hits}, constr_hits={c_hits}")
-                    if d_hits > c_hits:
-                        drivers_entries.extend(entries)
-                    elif c_hits > d_hits:
-                        constructors_entries.extend(entries)
+                if ttype == "drivers":
+                    drivers_list.extend(entries)
+                elif ttype == "constructors":
+                    constructors_list.extend(entries)
 
-            # Deduplicate by name (keep first occurrence)
+            # Deduplicate (keep first occurrence per name)
             seen_d, seen_c = set(), set()
-            data_output["drivers"]      = [e for e in drivers_entries     if e["name"] not in seen_d and not seen_d.add(e["name"])]
-            data_output["constructors"] = [e for e in constructors_entries if e["name"] not in seen_c and not seen_c.add(e["name"])]
+            data_output["drivers"]      = [e for e in drivers_list      if e["name"] not in seen_d and not seen_d.add(e["name"])]
+            data_output["constructors"] = [e for e in constructors_list  if e["name"] not in seen_c and not seen_c.add(e["name"])]
 
-            print(f"\n  ✅ Final: Drivers={len(data_output['drivers'])}, Constructors={len(data_output['constructors'])}")
-            print(f"  Driver tags:      {[e['name'] for e in data_output['drivers']]}")
-            print(f"  Constructor tags: {[e['name'] for e in data_output['constructors']]}")
+            print(f"\n  ✅ Drivers ({len(data_output['drivers'])}):      {[e['name'] for e in data_output['drivers']]}")
+            print(f"  ✅ Constructors ({len(data_output['constructors'])}): {[e['name'] for e in data_output['constructors']]}")
+
+            # Show what race columns were captured
+            if data_output["drivers"]:
+                sample = data_output["drivers"][0]
+                print(f"  Race pts columns: {list(sample['race_pts'].keys())}")
+                print(f"  Req pts columns:  {list(sample['req_pts'].keys())}")
+
+            if len(data_output["drivers"]) < 10:
+                print("  ⚠️  WARNING: fewer than 10 drivers scraped")
+            if len(data_output["constructors"]) < 5:
+                print("  ⚠️  WARNING: fewer than 5 constructors scraped")
 
         except Exception as e:
             print(f"Scraper error: {e}")

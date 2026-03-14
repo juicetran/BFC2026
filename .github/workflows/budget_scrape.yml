@@ -5,6 +5,10 @@ on:
     - cron: '0 0 * * *'    # daily at midnight UTC
   workflow_dispatch:         # allow manual trigger
 
+# ── Grant the GITHUB_TOKEN write access to push back to the repo ──
+permissions:
+  contents: write
+
 jobs:
   scrape_job:
     runs-on: ubuntu-latest
@@ -12,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}   # ensures push uses authenticated remote
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,6 +33,10 @@ jobs:
         run: |
           cd scripts
           python budget_scraper.py
+          echo "--- f1_budget_data.json preview (first 30 lines) ---"
+          head -30 f1_budget_data.json || echo "⚠️  File not found after scraper ran"
+          echo "--- Driver count ---"
+          python -c "import json; d=json.load(open('f1_budget_data.json')); print(f'Drivers: {len(d[\"drivers\"])}  Constructors: {len(d[\"constructors\"])}')" || true
           mv f1_budget_data.json ../f1_budget_data.json
 
       - name: Push updated data
@@ -34,6 +44,7 @@ jobs:
           git config --global user.name  "F1-Bot"
           git config --global user.email "f1bot@users.noreply.github.com"
           git add f1_budget_data.json
+          git status
           git diff --cached --quiet || git commit -m "chore: update f1_budget_data.json [skip ci]"
           git push
         env:

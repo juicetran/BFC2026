@@ -30,7 +30,6 @@ CONSTRUCTOR_TAGS = {
     "MER","FER","RED","MCL","AMR","ALP","WIL","HAA","AUD","VRB","CAD","AST"
 }
 
-
 def clean_price(raw: str) -> str:
     return raw.replace("$", "").strip()
 
@@ -43,6 +42,105 @@ def is_round_label(t: str) -> bool:
 def is_price_change(t: str) -> bool:
     """True for values like -0.3, -0.1, +0.1, +0.3, -0.6, +0.6 etc."""
     return bool(re.match(r'^[+\-]\d+\.\d+$', t.strip()))
+
+
+async def set_required_points_view(page) -> None:
+    """
+    Robustly switch the Budget Builder to "Required Points" view.
+
+    The site uses a custom React/JS dropdown — NOT a native <select>.
+    Strategy:
+      1. Try native <select> in case it ever becomes one
+      2. Click the visible dropdown trigger button
+      3. Wait for the option list to appear
+      4. Click the "Required Points" option
+      5. Verify the change took effect
+    """
+    TARGET = "required points"
+
+    # ── Attempt 1: native <select> ───────────────────────────────
+    try:
+        selects = await page.locator("select").all()
+        for sel in selects:
+            opts = await sel.locator("option").all()
+            for opt in opts:
+                txt = (await opt.inner_text()).strip()
+                if TARGET in txt.lower():
+                    await sel.select_option(label=txt)
+                    await page.wait_for_timeout(800)
+                    print(f"  ✅ [select] Set to: {txt!r}")
+                    return
+    except Exception as e:
+        print(f"  ⚠️  native select attempt: {e}")
+
+    # ── Attempt 2: click the custom dropdown button ──────────────
+    # The dropdown trigger typically contains the current value text.
+    # Common patterns: a <button> or <div role="button"> showing the mode name.
+    try:
+        # Find whichever button/div currently shows a mode name
+        trigger = None
+        candidates = await page.locator(
+            "button, [role='button'], [role='combobox'], [role='listbox']"
+        ).all()
+        for el in candidates:
+            txt = (await el.inner_text()).strip().lower()
+            # The trigger shows the current mode, e.g. "Odds" or "Required Points"
+            if any(kw in txt for kw in ["odds", "required", "points", "simulation"]):
+                trigger = el
+                break
+
+        if trigger is None:
+            # Fallback: look for the element containing the mode selector area
+            trigger = page.locator("text=Odds").first
+
+        print(f"  ℹ️  Clicking dropdown trigger …")
+        await trigger.click()
+        await page.wait_for_timeout(600)
+
+        # ── Wait for option list and click "Required Points" ─────
+        # Options may appear as <li>, <div role="option">, <button> etc.
+        option_selectors = [
+            "li:has-text('Required Points')",
+            "[role='option']:has-text('Required Points')",
+            "button:has-text('Required Points')",
+            "div:has-text('Required Points')",
+            "span:has-text('Required Points')",
+        ]
+        clicked = False
+        for sel in option_selectors:
+            try:
+                opt_el = page.locator(sel).first
+                if await opt_el.is_visible():
+                    await opt_el.click()
+                    await page.wait_for_timeout(800)
+                    print(f"  ✅ [click] Set to Required Points via {sel!r}")
+                    clicked = True
+                    break
+            except Exception:
+                continue
+
+        if not clicked:
+            # Last resort: find any visible element with exact text
+            await page.get_by_text("Required Points", exact=True).first.click()
+            await page.wait_for_timeout(800)
+            print("  ✅ [get_by_text] Set to Required Points")
+
+    except Exception as e:
+        print(f"  ⚠️  custom dropdown attempt failed: {e}")
+
+    # ── Verify ───────────────────────────────────────────────────
+    await page.wait_for_timeout(500)
+    try:
+        # Check page content — if Required Points is active, table headers
+        # should contain "≤" signs (the required-points format)
+        body = await page.inner_text("body")
+        if "≤" in body or "required" in body.lower():
+            print("  ✅ Verification: Required Points view confirmed")
+        else:
+            print("  ⚠️  Verification: Could not confirm Required Points view — data may show percentages")
+    except Exception:
+        pass
+
 
 
 async def identify_and_scrape(table) -> tuple[str | None, list[dict]]:
@@ -183,18 +281,7 @@ async def run_scraper():
             print("  ✅ Page loaded")
 
             # ── Select "Required Points" view ────────────────────
-            try:
-                for sel in await page.locator("select").all():
-                    for opt in await sel.locator("option").all():
-                        txt = (await opt.inner_text()).strip()
-                        if "required" in txt.lower():
-                            await sel.select_option(label=txt)
-                            print(f"  ✅ View set to: {txt}")
-                            await page.wait_for_timeout(1200)
-                            break
-            except Exception as e:
-                print(f"  ⚠️  Dropdown: {e}")
-
+            await set_required_points_view(page)
             await page.wait_for_timeout(800)
 
             # ── Scrape all tables ────────────────────────────────

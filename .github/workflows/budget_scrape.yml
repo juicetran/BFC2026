@@ -1,4 +1,4 @@
-name: Daily Budget Data Scraper - F1 Fantasy Tools
+name: Budget Data Scraper - F1 Fantasy Tools
 
 on:
   schedule:

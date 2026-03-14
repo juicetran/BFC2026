@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-03-14 16:44:32 UTC",
+  "last_updated": "2026-03-14 16:54:06 UTC",
   "league_id": "C4JXU0PEO03",
   "league_name": "Baby Formula Championship",
   "f1_players": {
@@ -410,36 +410,36 @@
         {
           "player_id": "232016281",
           "player_key": "kevcedes",
-          "round_points": 375.0,
-          "cumulative_points": 375.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9
         },
         {
           "player_id": "191134213",
           "player_key": "grahhh",
-          "round_points": 359.0,
-          "cumulative_points": 359.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9
         },
         {
           "player_id": "178336081",
           "player_key": "juice",
-          "round_points": 340.0,
-          "cumulative_points": 340.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9
         },
         {
           "player_id": "178339760",
           "player_key": "leclaren",
-          "round_points": 333.0,
-          "cumulative_points": 333.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9
         },
         {
           "player_id": "178798446",
           "player_key": "thumbi",
-          "round_points": 302.0,
-          "cumulative_points": 302.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9
         }
       ],
@@ -447,8 +447,8 @@
         {
           "player_id": "232016281",
           "player_key": "kevcedes",
-          "round_points": 375.0,
-          "cumulative_points": 375.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9,
           "budget_remaining": 0.1,
           "picks": [
@@ -534,8 +534,8 @@
         {
           "player_id": "191134213",
           "player_key": "grahhh",
-          "round_points": 359.0,
-          "cumulative_points": 359.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9,
           "budget_remaining": 0.1,
           "picks": [
@@ -621,8 +621,8 @@
         {
           "player_id": "178336081",
           "player_key": "juice",
-          "round_points": 340.0,
-          "cumulative_points": 340.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9,
           "budget_remaining": 0.1,
           "picks": [
@@ -708,8 +708,8 @@
         {
           "player_id": "178339760",
           "player_key": "leclaren",
-          "round_points": 333.0,
-          "cumulative_points": 333.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9,
           "budget_remaining": 0.1,
           "picks": [
@@ -795,8 +795,8 @@
         {
           "player_id": "178798446",
           "player_key": "thumbi",
-          "round_points": 302.0,
-          "cumulative_points": 302.0,
+          "round_points": null,
+          "cumulative_points": null,
           "team_value": 99.9,
           "budget_remaining": 0.1,
           "picks": [

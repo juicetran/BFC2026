@@ -1,0 +1,37 @@
+name: F1 Fantasy Data Sync
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'   # every 3 hours
+  workflow_dispatch:         # manual trigger from Actions tab
+
+jobs:
+  fantasy_sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install aiohttp
+
+      - name: Run Fantasy Sync
+        env:
+          F1_FANTASY_EMAIL:     ${{ secrets.F1_FANTASY_EMAIL }}
+          F1_FANTASY_PASSWORD:  ${{ secrets.F1_FANTASY_PASSWORD }}
+          F1_FANTASY_LEAGUE_ID: ${{ secrets.F1_FANTASY_LEAGUE_ID }}
+        run: python scripts/f1_fantasy_sync.py
+
+      - name: Commit updated data files
+        run: |
+          git config --global user.name  "F1-Bot"
+          git config --global user.email "bot@f1app.com"
+          git add f1_fantasy.json f1_teams.json
+          git commit -m "Auto-sync: F1 Fantasy data $(date -u '+%Y-%m-%d %H:%M UTC')" || exit 0
+          git push

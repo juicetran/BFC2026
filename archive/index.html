@@ -127,26 +127,26 @@
         <div id="h2h-content"></div>
     </div>
 
-    <!-- SCHEDULE PAGE -->
-    <div id="page-schedule" class="page px-4 pt-5">
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="fun text-xl" style="color:var(--text)">Schedule 📅</h2>
-            <span class="chip" style="background:rgba(58,134,255,.12);color:#3a86ff">2026 Season</span>
+    <!-- JUICEBOARD PAGE -->
+    <div id="page-juice" class="page px-4 pt-5">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="fun text-xl" style="color:var(--text)">The Juiceboard 🍊</h2>
+            <span class="chip" style="background:rgba(255,71,87,.12);color:#ff4757">R01 Roasts</span>
         </div>
-        <!-- Countdown card -->
-        <div class="card p-4 mb-4" id="sched-countdown-card">
-            <div class="text-[8px] uppercase tracking-widest mb-1" style="color:var(--muted)">Next Session · Sydney Time</div>
-            <div class="fun text-base mb-0.5" style="color:var(--text)" id="sched-countdown-event">Loading…</div>
-            <div class="font-mono text-2xl font-bold rb-text" id="sched-countdown-timer">--:--:--</div>
-            <div class="text-[9px] mt-1" style="color:var(--subtext)" id="sched-countdown-when"></div>
+        <p class="text-[9px] mb-4 uppercase tracking-wide" style="color:var(--muted)">Weekly highlights · certified takes · zero accountability</p>
+        <div id="juice-content"></div>
+    </div>
+
+    <!-- MARKET PAGE -->
+    <div id="page-market" class="page px-4 pt-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="fun text-xl" style="color:var(--text)">Market 📈</h2>
+            <span class="chip" style="background:rgba(46,196,182,.12);color:#2ec4b6" id="market-chip">—</span>
         </div>
-        <!-- Round selector -->
-        <div style="position:relative;margin-bottom:12px;">
-            <select id="sched-round-select" onchange="renderScheduleRound()" style="padding:9px 28px 9px 10px;"></select>
-            <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
-        </div>
-        <!-- Session table -->
-        <div class="card overflow-hidden" id="sched-session-table"></div>
+        <p class="text-[8px] uppercase tracking-widest mb-2" style="color:var(--muted)">Drivers</p>
+        <div class="card overflow-hidden mb-5" id="drivers-market"></div>
+        <p class="text-[8px] uppercase tracking-widest mb-2" style="color:var(--muted)">Constructors</p>
+        <div class="card overflow-hidden" id="constructors-market"></div>
     </div>
 
     <!-- DATA PAGE -->
@@ -161,9 +161,8 @@
         <div style="position:relative;margin-bottom:12px;">
             <select id="data-stat-select" onchange="onDataStatChange()" style="padding:9px 28px 9px 10px;">
                 <option value="budget">📉 Budget Stats</option>
-                <option value="fantasy">🏆 Fantasy Data</option>
-                <option value="teams">👥 League Teams</option>
-                <option value="live" disabled>⚡ Live Scoring (coming soon)</option>
+                <option value="fantasy" disabled>🏆 Fantasy Point Stats (coming soon)</option>
+                <option value="live"    disabled>⚡ Live Scoring Stats (coming soon)</option>
             </select>
             <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
         </div>
@@ -213,74 +212,18 @@
                 </div>
             </div>
         </div>
-
-        <!-- Fantasy Data panel -->
-        <div id="data-fantasy-panel" style="display:none;">
-            <div class="card2 flex items-center gap-2 px-3 py-2 mb-3" style="font-size:9px;color:var(--subtext);">
-                <span>🔗 Source:</span>
-                <a href="https://fantasy.formula1.com" target="_blank" rel="noopener" style="color:#3a86ff;text-decoration:none;">fantasy.formula1.com</a>
-                <span id="fantasy-updated-chip" style="margin-left:auto;color:var(--muted);font-size:8px;"></span>
-            </div>
-            <!-- Gameweek selector -->
-            <div style="position:relative;margin-bottom:12px;">
-                <select id="fantasy-gw-select" onchange="renderFantasyTable()" style="padding:9px 28px 9px 10px;"></select>
-                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
-            </div>
-            <!-- Drivers/Constructors toggle -->
-            <div class="flex rounded-xl p-1 gap-1 mb-3" style="background:#f5f4fa;border:1px solid #e2e0ee;display:inline-flex;">
-                <button id="fantasy-tab-drivers" onclick="setFantasyTab('drivers')"
-                    class="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all"
-                    style="background:#ffffff;color:var(--text)">Drivers</button>
-                <button id="fantasy-tab-constructors" onclick="setFantasyTab('constructors')"
-                    class="px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-bold transition-all"
-                    style="color:var(--muted)">Teams</button>
-            </div>
-            <p class="text-[8px] mb-2 px-1 uppercase tracking-widest" style="color:var(--muted)">Tap column header to sort ↕</p>
-            <div class="card overflow-hidden mb-3"><div id="fantasy-table"></div></div>
-            <div id="fantasy-error" style="display:none;" class="card2 p-4 text-center mb-3">
-                <div style="font-size:22px;margin-bottom:6px;">🔐</div>
-                <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Fantasy data not synced</div>
-                <div class="text-[9px]" style="color:var(--subtext)">Run the <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_fantasy_sync</code> GitHub Action to pull data from the F1 Fantasy API.</div>
-            </div>
-        </div>
-
-        <!-- League Teams panel -->
-        <div id="data-teams-panel" style="display:none;">
-            <div class="card2 flex items-center gap-2 px-3 py-2 mb-3" style="font-size:9px;color:var(--subtext);">
-                <span>🏁 Baby Formula Championship · League Teams</span>
-                <span id="teams-updated-chip" style="margin-left:auto;color:var(--muted);font-size:8px;"></span>
-            </div>
-            <!-- Player selector -->
-            <div style="position:relative;margin-bottom:10px;">
-                <select id="teams-player-select" onchange="renderTeamsPanel()" style="padding:9px 28px 9px 10px;"></select>
-                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
-            </div>
-            <!-- Round selector -->
-            <div style="position:relative;margin-bottom:12px;">
-                <select id="teams-round-select" onchange="renderTeamsPanel()" style="padding:9px 28px 9px 10px;"></select>
-                <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--muted)">▼</span>
-            </div>
-            <!-- Budget + points summary -->
-            <div class="grid grid-cols-3 gap-2 mb-3" id="teams-summary"></div>
-            <!-- Team picks table -->
-            <div class="card overflow-hidden mb-3"><div id="teams-picks-table"></div></div>
-            <div id="teams-error" style="display:none;" class="card2 p-4 text-center mb-3">
-                <div style="font-size:22px;margin-bottom:6px;">🔐</div>
-                <div class="text-[11px] font-bold mb-1" style="color:var(--text)">Team data not synced</div>
-                <div class="text-[9px]" style="color:var(--subtext)">Run the <code style="background:#e8e6f5;padding:1px 4px;border-radius:4px;">f1_fantasy_sync</code> GitHub Action to pull league data.</div>
-            </div>
-        </div>
     </div>
 
     <!-- BOTTOM NAV -->
     <nav class="fixed bottom-0 left-0 right-0 flex justify-center z-50">
         <div class="w-full max-w-[448px] backdrop-blur border-t" style="background:rgba(240,239,244,.96);border-color:#e2e0ee">
             <div class="rb-bar"></div>
-            <div class="grid grid-cols-4 gap-1 px-2 py-2">
-                <div class="nav-btn active" onclick="navigate('home')"     id="nav-home"><div class="ni">🏠</div><div class="nl">Home</div></div>
-                <div class="nav-btn"        onclick="navigate('h2h')"      id="nav-h2h"><div class="ni">⚡</div><div class="nl">H2H</div></div>
-                <div class="nav-btn"        onclick="navigate('schedule')" id="nav-schedule"><div class="ni">📅</div><div class="nl">Schedule</div></div>
-                <div class="nav-btn"        onclick="navigate('data')"     id="nav-data"><div class="ni">📊</div><div class="nl">Data</div></div>
+            <div class="grid grid-cols-5 gap-1 px-2 py-2">
+                <div class="nav-btn active" onclick="navigate('home')"   id="nav-home"><div class="ni">🏠</div><div class="nl">Home</div></div>
+                <div class="nav-btn"        onclick="navigate('h2h')"    id="nav-h2h"><div class="ni">⚡</div><div class="nl">H2H</div></div>
+                <div class="nav-btn"        onclick="navigate('juice')"  id="nav-juice"><div class="ni">🍊</div><div class="nl">Juice</div></div>
+                <div class="nav-btn"        onclick="navigate('market')" id="nav-market"><div class="ni">📈</div><div class="nl">Market</div></div>
+                <div class="nav-btn"        onclick="navigate('data')"   id="nav-data"><div class="ni">📊</div><div class="nl">Data</div></div>
             </div>
         </div>
     </nav>
@@ -298,6 +241,20 @@ const PLAYER_CONFIG = {
     thumbi:   { id:'thumbi',  name:'Thumbi',        owner:'Thomas George',  emoji:'👍', color:'#c77dff' },
 };
 
+const JUICEBOARD_DATA = [
+    { emoji:'👑', title:'King of the Grid',       subject:'Kevcedes',          color:'#f4a100', tag:'W of the Week',
+      text:"Kevin built the best team and it wasn't even close. Russell 2x star scoring 78, Bearman 20, Lindblad 15 on debut, 240 total. This man is playing F1 Fantasy in 4D chess while everyone else is playing draughts." },
+    { emoji:'🪦', title:'Piastri DNS Pain Award', subject:'RACING JUICE',      color:'#ff4757', tag:'Certified L',
+      text:"Justin's star pick crashed on the sighting lap before the race even started. Zero points from your main man. That's not bad luck — that's cosmically targeted suffering. Prayers." },
+    { emoji:'📉', title:'Hadjar Did WHAT Now?',   subject:'Anyone with Hadjar', color:'#c77dff', tag:'Minus Points',
+      text:"-8 points. NEGATIVE EIGHT. Isack Hadjar out here actively destroying fantasy teams. DNF lap 11, power unit in flames. If Hadjar were a stock, the SEC would investigate it as deliberate market manipulation." },
+    { emoji:'🚀', title:'P20 to P6',              subject:'Verstappen owners', color:'#f4a100', tag:'Recovery Drive',
+      text:"Max crashed in qualifying, started last, finished P6. 14 positions gained in one race. Whoever had Verstappen picked up an absolute haul of overtake points. A reminder that Max in a fast car is just cosmically unfair." },
+    { emoji:'🌟', title:'Rookie on Debut',        subject:'Arvid Lindblad',    color:'#2ec4b6', tag:'Sleeper Hit',
+      text:"15 points, P8 finish, 18 years old, first F1 race. Third youngest driver ever to score F1 points. Whoever grabbed Lindblad early is eating well while the rest panic-sell Piastri." },
+    { emoji:'🧠', title:'Galaxy Brain Mode',      subject:'LeClaren F1',       color:'#3a86ff', tag:'Mysterious',
+      text:"Selina has $101.5M in team value and still DROPS a position. The car is fast, the logic is elusive. We respect the process even if we don't understand the process." },
+];
 
 const TEAM_COLORS = {
     'Mercedes':'#00d2be','Ferrari':'#e8002d','Red Bull':'#3671c6',
@@ -312,9 +269,11 @@ const MEDAL       = ['🥇','🥈','🥉'];
 // ═══════════════════════════════════════════════════════════════════
 // APP STATE — populated from history.json
 // ═══════════════════════════════════════════════════════════════════
-let DB      = null;
-let ROUNDS  = [];
-let PLAYERS = {};
+let DB          = null;   // full history.json object
+let ROUNDS      = [];     // DB.rounds array, sorted
+let PLAYERS     = {};     // merged PLAYER_CONFIG + live data
+let rawsMode    = 'drivers';
+let rawsSort    = { col:'pts', dir:-1 };
 
 // ═══════════════════════════════════════════════════════════════════
 // DATA LOADING
@@ -375,7 +334,9 @@ function applyHistory(db) {
     // Render all sections
     renderStandings();
     renderH2H();
-    populateScheduleDropdown();
+    renderJuice();
+    renderMarket();
+    renderRaws();
 }
 
 // Seed round — used if history.json not yet available
@@ -442,6 +403,17 @@ function populateRoundDropdowns() {
     });
     // Default to latest round
     if (ROUNDS.length) sSelect.value = ROUNDS[ROUNDS.length - 1].round;
+
+    // Raws dropdown
+    const rSelect = document.getElementById('raws-race-select');
+    rSelect.innerHTML = '<option value="overall">Overall (all races)</option>';
+    [...ROUNDS].reverse().forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.round;
+        opt.textContent = r.label;
+        rSelect.appendChild(opt);
+    });
+    if (ROUNDS.length) rSelect.value = ROUNDS[ROUNDS.length - 1].round;
 
     // H2H dropdowns — player names
     ['h2h-left','h2h-right'].forEach((id, i) => {
@@ -690,6 +662,63 @@ function renderH2H() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// RENDER — JUICE
+// ═══════════════════════════════════════════════════════════════════
+function renderJuice() {
+    document.getElementById('juice-content').innerHTML = JUICEBOARD_DATA.map(j => `
+    <div class="jcard" style="border-left-color:${j.color}">
+        <div class="flex gap-3 items-start">
+            <span class="text-2xl flex-shrink-0">${j.emoji}</span>
+            <div class="flex-1">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                    <span class="fun text-[15px]" style="color:var(--text)">${j.title}</span>
+                    <span class="chip" style="background:${j.color}20;color:${j.color}">${j.tag}</span>
+                </div>
+                <div class="text-[10px] font-bold mb-1.5" style="color:${j.color}">${j.subject}</div>
+                <div class="text-[11px] leading-relaxed" style="color:var(--subtext)">${j.text}</div>
+            </div>
+        </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER — MARKET  (uses latest round data)
+// ═══════════════════════════════════════════════════════════════════
+function renderMarket() {
+    const latest = ROUNDS[ROUNDS.length - 1];
+    if (!latest) return;
+    document.getElementById('market-chip').textContent = `Post ${latest.key}`;
+
+    const buildTable = (data) => {
+        const sorted = [...data].sort((a,b) => b.delta - a.delta);
+        return `<table class="w-full">
+            <thead><tr class="border-b" style="border-color:var(--border);background:var(--card2)">
+                <th class="p-3 text-left text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Name</th>
+                <th class="p-3 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Price</th>
+                <th class="p-3 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Δ Price</th>
+                <th class="p-3 text-right text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Pts</th>
+            </tr></thead>
+            <tbody>${sorted.map(d => {
+                const dc = d.delta > 0 ? '#2ec4b6' : d.delta < 0 ? '#ff4757' : '#9090b8';
+                const pc = d.pts  > 0 ? '#2ec4b6' : d.pts  < 0 ? '#ff4757' : '#9090b8';
+                return `<tr class="border-b last:border-0" style="border-color:var(--border)">
+                    <td class="p-3">
+                        <div class="font-bold text-[11px]" style="color:var(--text)">${d.name}</div>
+                        ${d.team ? `<div class="text-[9px]" style="color:var(--muted)">${d.team}</div>` : ''}
+                    </td>
+                    <td class="p-3 text-center font-mono text-[10px]" style="color:var(--subtext)">$${d.price}M</td>
+                    <td class="p-3 text-center font-mono text-xs font-bold" style="color:${dc}">${d.delta > 0?'+':''}$${Math.abs(d.delta)}M</td>
+                    <td class="p-3 text-right font-mono text-xs font-bold" style="color:${pc}">${d.pts > 0?'+':''}${d.pts}</td>
+                </tr>`;
+            }).join('')}</tbody>
+        </table>`;
+    };
+
+    document.getElementById('drivers-market').innerHTML      = buildTable(latest.drivers      || []);
+    document.getElementById('constructors-market').innerHTML = buildTable(latest.constructors || []);
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // DATA PAGE — Budget Stats (scraped from f1fantasytools.com)
 // ═══════════════════════════════════════════════════════════════════
 let dataMode = 'drivers';
@@ -853,495 +882,12 @@ function renderBudgetTable() {
     document.getElementById('data-budget-table').style.display = '';
 }
 
-// Stubs — juice/market removed
-function renderJuice() {}
-function renderMarket() {}
+// Stubs so applyHistory() renderRaws() calls don't throw
+let rawsMode = 'drivers';
+let rawsSort = { col:'pts', dir:-1 };
 function setRawsTab() {}
 function sortRaws() {}
 function renderRaws() {}
-
-// ═══════════════════════════════════════════════════════════════════
-// SCHEDULE PAGE
-// ═══════════════════════════════════════════════════════════════════
-
-// Full session templates per race type (UTC offsets applied at render)
-// Sydney is UTC+11 (AEDT) in Mar-Apr, UTC+10 (AEST) May onward
-const SESSION_TEMPLATES = {
-    traditional: [
-        { key:'fp1',   label:'Free Practice 1', dayOffset:0, utcH:3,  utcM:30 },
-        { key:'fp2',   label:'Free Practice 2', dayOffset:0, utcH:7,  utcM:0  },
-        { key:'fp3',   label:'Free Practice 3', dayOffset:1, utcH:4,  utcM:30 },
-        { key:'quali', label:'Qualifying',       dayOffset:1, utcH:8,  utcM:0  },
-        { key:'race',  label:'Race',             dayOffset:2, utcH:7,  utcM:0  },
-    ],
-    sprint: [
-        { key:'fp1',   label:'Free Practice 1', dayOffset:0, utcH:3,  utcM:30 },
-        { key:'sq',    label:'Sprint Qualifying',dayOffset:0, utcH:7,  utcM:30 },
-        { key:'sprint',label:'Sprint Race',      dayOffset:1, utcH:4,  utcM:0  },
-        { key:'quali', label:'Qualifying',       dayOffset:1, utcH:8,  utcM:0  },
-        { key:'race',  label:'Race',             dayOffset:2, utcH:7,  utcM:0  },
-    ],
-};
-
-const F1_SCHEDULE = [
-    { round:1,  gp:'Australian Grand Prix',        location:'Melbourne',        circuit:'Albert Park Circuit',               type:'traditional', date:'Mar 08', full_dates:'Mar 06-08', year:2026, month:2,  day:6  },
-    { round:2,  gp:'Chinese Grand Prix',           location:'Shanghai',         circuit:'Shanghai International Circuit',    type:'sprint',       date:'Mar 15', full_dates:'Mar 13-15', year:2026, month:2,  day:13 },
-    { round:3,  gp:'Japanese Grand Prix',          location:'Suzuka',           circuit:'Suzuka Circuit',                    type:'traditional', date:'Mar 29', full_dates:'Mar 27-29', year:2026, month:2,  day:27 },
-    { round:4,  gp:'Bahrain Grand Prix',           location:'Sakhir',           circuit:'Bahrain International Circuit',     type:'traditional', date:'Apr 12', full_dates:'Apr 10-12', year:2026, month:3,  day:10 },
-    { round:5,  gp:'Saudi Arabian Grand Prix',     location:'Jeddah',           circuit:'Jeddah Corniche Circuit',           type:'traditional', date:'Apr 19', full_dates:'Apr 17-19', year:2026, month:3,  day:17 },
-    { round:6,  gp:'Miami Grand Prix',             location:'Miami',            circuit:'Miami International Autodrome',     type:'sprint',       date:'May 03', full_dates:'May 01-03', year:2026, month:4,  day:1  },
-    { round:7,  gp:'Canadian Grand Prix',          location:'Montreal',         circuit:'Circuit Gilles Villeneuve',         type:'sprint',       date:'May 24', full_dates:'May 22-24', year:2026, month:4,  day:22 },
-    { round:8,  gp:'Monaco Grand Prix',            location:'Monte Carlo',      circuit:'Circuit de Monaco',                 type:'traditional', date:'Jun 07', full_dates:'Jun 05-07', year:2026, month:5,  day:5  },
-    { round:9,  gp:'Barcelona-Catalunya GP',       location:'Barcelona',        circuit:'Circuit de Barcelona-Catalunya',    type:'traditional', date:'Jun 14', full_dates:'Jun 12-14', year:2026, month:5,  day:12 },
-    { round:10, gp:'Austrian Grand Prix',          location:'Spielberg',        circuit:'Red Bull Ring',                     type:'traditional', date:'Jun 28', full_dates:'Jun 26-28', year:2026, month:5,  day:26 },
-    { round:11, gp:'British Grand Prix',           location:'Silverstone',      circuit:'Silverstone Circuit',               type:'sprint',       date:'Jul 05', full_dates:'Jul 03-05', year:2026, month:6,  day:3  },
-    { round:12, gp:'Belgian Grand Prix',           location:'Spa-Francorchamps',circuit:'Circuit de Spa-Francorchamps',      type:'traditional', date:'Jul 19', full_dates:'Jul 17-19', year:2026, month:6,  day:17 },
-    { round:13, gp:'Hungarian Grand Prix',         location:'Budapest',         circuit:'Hungaroring',                       type:'traditional', date:'Jul 26', full_dates:'Jul 24-26', year:2026, month:6,  day:24 },
-    { round:14, gp:'Dutch Grand Prix',             location:'Zandvoort',        circuit:'Circuit Zandvoort',                 type:'sprint',       date:'Aug 23', full_dates:'Aug 21-23', year:2026, month:7,  day:21 },
-    { round:15, gp:'Italian Grand Prix',           location:'Monza',            circuit:'Autodromo Nazionale Monza',         type:'traditional', date:'Sep 06', full_dates:'Sep 04-06', year:2026, month:8,  day:4  },
-    { round:16, gp:'Spanish Grand Prix',           location:'Madrid',           circuit:'Madrid Street Circuit',             type:'traditional', date:'Sep 13', full_dates:'Sep 11-13', year:2026, month:8,  day:11 },
-    { round:17, gp:'Azerbaijan Grand Prix',        location:'Baku',             circuit:'Baku City Circuit',                 type:'traditional', date:'Sep 26', full_dates:'Sep 24-26', year:2026, month:8,  day:24 },
-    { round:18, gp:'Singapore Grand Prix',         location:'Marina Bay',       circuit:'Marina Bay Street Circuit',         type:'sprint',       date:'Oct 11', full_dates:'Oct 09-11', year:2026, month:9,  day:9  },
-    { round:19, gp:'United States Grand Prix',     location:'Austin',           circuit:'Circuit of the Americas',           type:'traditional', date:'Oct 25', full_dates:'Oct 23-25', year:2026, month:9,  day:23 },
-    { round:20, gp:'Mexico City Grand Prix',       location:'Mexico City',      circuit:'Autódromo Hermanos Rodríguez',      type:'traditional', date:'Nov 01', full_dates:'Oct 30-Nov 01', year:2026, month:9,  day:30 },
-    { round:21, gp:'São Paulo Grand Prix',         location:'São Paulo',        circuit:'Autódromo José Carlos Pace',        type:'traditional', date:'Nov 08', full_dates:'Nov 06-08', year:2026, month:10, day:6  },
-    { round:22, gp:'Las Vegas Grand Prix',         location:'Las Vegas',        circuit:'Las Vegas Strip Circuit',           type:'traditional', date:'Nov 21', full_dates:'Nov 19-21', year:2026, month:10, day:19 },
-    { round:23, gp:'Qatar Grand Prix',             location:'Lusail',           circuit:'Lusail International Circuit',      type:'sprint',       date:'Nov 29', full_dates:'Nov 27-29', year:2026, month:10, day:27 },
-    { round:24, gp:'Abu Dhabi Grand Prix',         location:'Yas Island',       circuit:'Yas Marina Circuit',                type:'traditional', date:'Dec 06', full_dates:'Dec 04-06', year:2026, month:11, day:4  },
-];
-
-const GP_FLAGS = {
-    'Australian Grand Prix':'🇦🇺','Chinese Grand Prix':'🇨🇳','Japanese Grand Prix':'🇯🇵',
-    'Bahrain Grand Prix':'🇧🇭','Saudi Arabian Grand Prix':'🇸🇦','Miami Grand Prix':'🇺🇸',
-    'Canadian Grand Prix':'🇨🇦','Monaco Grand Prix':'🇲🇨','Barcelona-Catalunya GP':'🇪🇸',
-    'Austrian Grand Prix':'🇦🇹','British Grand Prix':'🇬🇧','Belgian Grand Prix':'🇧🇪',
-    'Hungarian Grand Prix':'🇭🇺','Dutch Grand Prix':'🇳🇱','Italian Grand Prix':'🇮🇹',
-    'Spanish Grand Prix':'🇪🇸','Azerbaijan Grand Prix':'🇦🇿','Singapore Grand Prix':'🇸🇬',
-    'United States Grand Prix':'🇺🇸','Mexico City Grand Prix':'🇲🇽','São Paulo Grand Prix':'🇧🇷',
-    'Las Vegas Grand Prix':'🇺🇸','Qatar Grand Prix':'🇶🇦','Abu Dhabi Grand Prix':'🇦🇪',
-};
-
-// Sydney offset: AEDT (UTC+11) Oct–Apr, AEST (UTC+10) Apr–Sep
-function sydneyOffsetHours(date) {
-    const m = date.getUTCMonth(); // 0=Jan
-    // AEDT: last Sun Oct → first Sun Apr  (approx months 9-3)
-    return (m <= 3 || m >= 9) ? 11 : 10;
-}
-
-function utcToSydney(utcDate) {
-    const off = sydneyOffsetHours(utcDate);
-    return new Date(utcDate.getTime() + off * 3600000);
-}
-
-function nowSydney() {
-    return utcToSydney(new Date());
-}
-
-// Build all sessions for a round as { label, utcDate, sydDate }
-function buildSessions(race) {
-    const tpl = SESSION_TEMPLATES[race.type] || SESSION_TEMPLATES.traditional;
-    // race.month is 0-indexed (Mar=2), race.day is start of weekend (Friday)
-    return tpl.map(s => {
-        const utcDate = new Date(Date.UTC(race.year, race.month, race.day + s.dayOffset, s.utcH, s.utcM, 0));
-        return {
-            key:     s.key,
-            label:   s.label,
-            utcDate,
-            sydDate: utcToSydney(utcDate),
-        };
-    });
-}
-
-// Format as "Sat 7 Mar, 3:30 PM"
-function fmtSyd(d) {
-    const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const months= ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    let h = d.getUTCHours(), m = d.getUTCMinutes();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    const mm = String(m).padStart(2,'0');
-    return `${days[d.getUTCDay()]} ${d.getUTCDate()} ${months[d.getUTCMonth()]}, ${h}:${mm} ${ampm}`;
-}
-
-function fmtCountdown(ms) {
-    if (ms <= 0) return '00:00:00';
-    const s  = Math.floor(ms / 1000);
-    const dd = Math.floor(s / 86400);
-    const hh = Math.floor((s % 86400) / 3600);
-    const mm = Math.floor((s % 3600) / 60);
-    const ss = s % 60;
-    if (dd > 0) return `${dd}d ${String(hh).padStart(2,'0')}h ${String(mm).padStart(2,'0')}m`;
-    return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
-}
-
-let _schedCountdownInterval = null;
-
-function populateScheduleDropdown() {
-    const sel = document.getElementById('sched-round-select');
-    if (!sel) return;
-    const nowUtc = new Date();
-    // Find next or current round
-    let defaultRound = F1_SCHEDULE[0].round;
-    for (const r of F1_SCHEDULE) {
-        const sessions = buildSessions(r);
-        const lastSession = sessions[sessions.length - 1];
-        if (lastSession.utcDate >= nowUtc) { defaultRound = r.round; break; }
-    }
-    sel.innerHTML = F1_SCHEDULE.map(r => {
-        const flag = GP_FLAGS[r.gp] || '🏁';
-        return `<option value="${r.round}" ${r.round === defaultRound ? 'selected' : ''}>R${String(r.round).padStart(2,'0')} · ${flag} ${r.gp} · ${r.date}</option>`;
-    }).join('');
-    renderScheduleRound();
-    startCountdown();
-}
-
-function startCountdown() {
-    if (_schedCountdownInterval) clearInterval(_schedCountdownInterval);
-    _schedCountdownInterval = setInterval(updateCountdown, 1000);
-    updateCountdown();
-}
-
-function updateCountdown() {
-    const nowUtc = new Date();
-    // Find first future session across all rounds
-    let nextSession = null, nextRace = null;
-    outer: for (const r of F1_SCHEDULE) {
-        for (const s of buildSessions(r)) {
-            if (s.utcDate > nowUtc) { nextSession = s; nextRace = r; break outer; }
-        }
-    }
-    const evEl   = document.getElementById('sched-countdown-event');
-    const tmEl   = document.getElementById('sched-countdown-timer');
-    const whEl   = document.getElementById('sched-countdown-when');
-    if (!nextSession) {
-        if (evEl) evEl.textContent  = 'Season Complete 🏁';
-        if (tmEl) tmEl.textContent  = '—';
-        if (whEl) whEl.textContent  = '';
-        return;
-    }
-    const flag = GP_FLAGS[nextRace.gp] || '🏁';
-    if (evEl) evEl.textContent  = `${flag} ${nextRace.gp} · ${nextSession.label}`;
-    if (tmEl) tmEl.textContent  = fmtCountdown(nextSession.utcDate - nowUtc);
-    if (whEl) whEl.textContent  = fmtSyd(nextSession.sydDate);
-}
-
-function renderScheduleRound() {
-    const roundNum = parseInt(document.getElementById('sched-round-select').value);
-    const race = F1_SCHEDULE.find(r => r.round === roundNum);
-    if (!race) return;
-    const sessions  = buildSessions(race);
-    const nowUtc    = new Date();
-    const flag      = GP_FLAGS[race.gp] || '🏁';
-
-    // Find the first future session index
-    let nextIdx = sessions.findIndex(s => s.utcDate > nowUtc);
-
-    const rows = sessions.map((s, i) => {
-        const isPast     = s.utcDate <= nowUtc;
-        const isNext     = i === nextIdx;
-        const isUpcoming = !isPast && i !== nextIdx;
-
-        let statusBg, statusColor, statusTag;
-        if (isPast) {
-            statusBg    = 'rgba(255,71,87,.10)';
-            statusColor = '#ff4757';
-            statusTag   = 'FINISHED';
-        } else if (isNext) {
-            statusBg    = 'rgba(46,196,182,.15)';
-            statusColor = '#2ec4b6';
-            statusTag   = 'UPCOMING NEXT ▶';
-        } else {
-            statusBg    = 'rgba(46,196,182,.06)';
-            statusColor = '#74d9d0';
-            statusTag   = 'UPCOMING';
-        }
-
-        const rowBg = isNext ? 'rgba(46,196,182,.04)' : isPast ? 'rgba(255,71,87,.03)' : '';
-
-        return `<tr style="border-bottom:1px solid var(--border);background:${rowBg}">
-            <td class="p-3">
-                <div class="font-bold text-[11px]" style="color:var(--text)">${s.label}</div>
-                <div class="text-[9px] mt-0.5" style="color:var(--muted)">${fmtSyd(s.sydDate)} AEDT/AEST</div>
-            </td>
-            <td class="p-3 text-right" style="vertical-align:middle;">
-                <span style="background:${statusBg};color:${statusColor};font-size:7px;font-weight:bold;padding:2px 6px;border-radius:5px;letter-spacing:.05em;white-space:nowrap;">${statusTag}</span>
-            </td>
-        </tr>`;
-    }).join('');
-
-    document.getElementById('sched-session-table').innerHTML = `
-    <div style="padding:12px 14px 8px;border-bottom:1px solid var(--border);">
-        <div class="fun text-base" style="color:var(--text)">${flag} ${race.gp}</div>
-        <div class="text-[9px] mt-0.5" style="color:var(--subtext)">${race.circuit} · ${race.full_dates} · ${race.type === 'sprint' ? '⚡ Sprint Weekend' : '🏁 Traditional Weekend'}</div>
-    </div>
-    <table class="w-full"><tbody>${rows}</tbody></table>`;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// DATA PAGE — Fantasy Data panel (from f1_fantasy.json)
-// ═══════════════════════════════════════════════════════════════════
-let F1_FANTASY    = null;   // loaded from f1_fantasy.json
-let fantasyMode   = 'drivers';
-let fantasySort   = { col:'total_points', dir:-1 };
-
-function setFantasyTab(mode) {
-    fantasyMode = mode;
-    ['drivers','constructors'].forEach(t => {
-        const btn = document.getElementById(`fantasy-tab-${t}`);
-        if (!btn) return;
-        if (t === mode) { btn.style.background='#ffffff'; btn.style.color='var(--text)'; }
-        else            { btn.style.background='';        btn.style.color='var(--muted)'; }
-    });
-    renderFantasyTable();
-}
-
-function sortFantasyCol(col) {
-    if (fantasySort.col === col) fantasySort.dir *= -1;
-    else { fantasySort.col = col; fantasySort.dir = -1; }
-    renderFantasyTable();
-}
-
-async function loadF1Fantasy() {
-    try {
-        const res = await fetch('./f1_fantasy.json', { cache:'no-cache' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        F1_FANTASY = await res.json();
-        populateFantasyGameweeks();
-        renderFantasyTable();
-        document.getElementById('fantasy-error').style.display = 'none';
-    } catch (e) {
-        console.warn('f1_fantasy.json not found:', e);
-        document.getElementById('fantasy-error').style.display = '';
-        document.getElementById('fantasy-table').innerHTML = '';
-    }
-}
-
-function populateFantasyGameweeks() {
-    if (!F1_FANTASY) return;
-    const sel = document.getElementById('fantasy-gw-select');
-    if (!sel) return;
-    const gws = F1_FANTASY.gameweeks || [];
-    sel.innerHTML = `<option value="overall">📊 Overall (Season)</option>` +
-        [...gws].reverse().map(gw =>
-            `<option value="${gw.round}">${GP_FLAGS[gw.gp]||'🏁'} R${String(gw.round).padStart(2,'0')} · ${gw.gp||gw.label||''}</option>`
-        ).join('');
-    // Default to latest
-    if (gws.length) sel.value = gws[gws.length - 1].round;
-}
-
-function renderFantasyTable() {
-    if (!F1_FANTASY) return;
-    const gwSel = document.getElementById('fantasy-gw-select');
-    const gwVal = gwSel ? gwSel.value : 'overall';
-
-    // Resolve data for selected gameweek
-    let drivers = [], constructors = [];
-    if (gwVal === 'overall') {
-        drivers      = F1_FANTASY.overall?.drivers      || [];
-        constructors = F1_FANTASY.overall?.constructors || [];
-        document.getElementById('fantasy-updated-chip').textContent = F1_FANTASY.last_updated?.split(' ')[0] || '';
-    } else {
-        const gw = (F1_FANTASY.gameweeks || []).find(g => String(g.round) === String(gwVal));
-        drivers      = gw?.drivers      || [];
-        constructors = gw?.constructors || [];
-        document.getElementById('fantasy-updated-chip').textContent = gw?.date || '';
-    }
-
-    const raw = fantasyMode === 'drivers' ? drivers : constructors;
-    const sorted = [...raw].sort((a, b) => {
-        const av = a[fantasySort.col] ?? -Infinity;
-        const bv = b[fantasySort.col] ?? -Infinity;
-        return fantasySort.dir * (bv - av);
-    });
-
-    const th = (col, label, extra='') => {
-        const active = fantasySort.col === col;
-        const arrow  = active ? (fantasySort.dir === -1 ? '↓' : '↑') : '↕';
-        return `<th class="p-2 text-center cursor-pointer select-none text-[8px] uppercase tracking-wider font-normal whitespace-nowrap ${extra}"
-                    style="color:${active?'#3a86ff':'var(--muted)'}" onclick="sortFantasyCol('${col}')">
-                    ${label}<span style="opacity:.7;margin-left:2px">${arrow}</span></th>`;
-    };
-
-    const TEAM_TAG_COLORS = {
-        'MER':'#00d2be','FER':'#e8002d','RED':'#3671c6','MCL':'#ff8000',
-        'AMR':'#358c75','ALP':'#0093cc','WIL':'#005aff','HAA':'#888888',
-        'AUD':'#52e252','VRB':'#6692ff','CAD':'#cc0000',
-    };
-
-    const rows = sorted.map((d, i) => {
-        const tag   = d.short_name || d.name || '—';
-        const tc    = TEAM_TAG_COLORS[d.team_tag || tag] || '#9090b8';
-        const pts   = d.total_points ?? d.points ?? '—';
-        const price = d.price != null ? `$${d.price}M` : '—';
-        const ptsNum = typeof pts === 'number' ? pts : 0;
-        const rankCol = i===0?'#f4a100':i===1?'#9a9aaa':i===2?'#cd7f32':'var(--muted)';
-        return `<tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)"
-                    onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
-            <td class="p-2 text-center font-mono text-[9px] font-bold w-6" style="color:${rankCol}">${i+1}</td>
-            <td class="p-3">
-                <div class="flex items-center gap-2">
-                    <span style="background:${tc}22;color:${tc};font-size:9px;font-weight:bold;padding:2px 6px;border-radius:6px;font-family:'Share Tech Mono',monospace;">${tag}</span>
-                    <span class="text-[10px]" style="color:var(--text)">${d.full_name || d.name || ''}</span>
-                </div>
-                ${fantasyMode==='drivers' && d.team ? `<div class="text-[8px] mt-0.5 ml-9" style="color:${tc}">${d.team}</div>` : ''}
-            </td>
-            <td class="p-2 text-center font-mono text-[10px]" style="color:var(--subtext)">${price}</td>
-            <td class="p-2 text-center font-mono text-[11px] font-bold" style="color:${ptsNum>0?'#2ec4b6':ptsNum<0?'#ff4757':'var(--subtext)'}">${pts}</td>
-        </tr>`;
-    }).join('');
-
-    const label = fantasyMode === 'drivers' ? 'Driver' : 'Constructor';
-    document.getElementById('fantasy-table').innerHTML = rows.length ? `
-    <div style="overflow-x:auto">
-    <table class="w-full" style="min-width:280px">
-        <thead><tr class="border-b" style="background:var(--card2);border-color:var(--border)">
-            <th class="p-2 text-center text-[8px] font-normal w-6" style="color:var(--muted)">#</th>
-            ${th('name', label, 'text-left pl-3')}
-            ${th('price', 'Price')}
-            ${th('total_points', 'Pts')}
-        </tr></thead>
-        <tbody>${rows}</tbody>
-    </table></div>` : `<div class="p-6 text-center text-[10px]" style="color:var(--muted)">No data for this selection</div>`;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// DATA PAGE — League Teams panel (from f1_teams.json)
-// ═══════════════════════════════════════════════════════════════════
-let F1_TEAMS = null;  // loaded from f1_teams.json
-
-async function loadF1Teams() {
-    try {
-        const res = await fetch('./f1_teams.json', { cache:'no-cache' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        F1_TEAMS = await res.json();
-        populateTeamsDropdowns();
-        renderTeamsPanel();
-        document.getElementById('teams-error').style.display = 'none';
-    } catch (e) {
-        console.warn('f1_teams.json not found:', e);
-        document.getElementById('teams-error').style.display = '';
-        document.getElementById('teams-summary').innerHTML = '';
-        document.getElementById('teams-picks-table').innerHTML = '';
-    }
-}
-
-function populateTeamsDropdowns() {
-    if (!F1_TEAMS) return;
-
-    // Player dropdown
-    const pSel = document.getElementById('teams-player-select');
-    if (pSel) {
-        pSel.innerHTML = (F1_TEAMS.players || []).map(p =>
-            `<option value="${p.id}">${p.emoji||'👤'} ${p.name}</option>`
-        ).join('');
-    }
-
-    // Round dropdown — show completed rounds + current
-    const rSel = document.getElementById('teams-round-select');
-    if (!rSel) return;
-    const rounds = F1_TEAMS.rounds || [];
-    rSel.innerHTML = rounds.map(r => {
-        const flag = GP_FLAGS[r.gp] || '🏁';
-        const status = r.confirmed ? '✅' : '🔄';
-        return `<option value="${r.round}">${status} R${String(r.round).padStart(2,'0')} · ${flag} ${r.gp||r.label}</option>`;
-    }).join('');
-    // Default to latest
-    if (rounds.length) rSel.value = rounds[rounds.length - 1].round;
-}
-
-function renderTeamsPanel() {
-    if (!F1_TEAMS) return;
-    const playerId = document.getElementById('teams-player-select')?.value;
-    const roundNum = parseInt(document.getElementById('teams-round-select')?.value);
-    if (!playerId || !roundNum) return;
-
-    // Find the round record for this player
-    const roundData = (F1_TEAMS.rounds || []).find(r => r.round === roundNum);
-    if (!roundData) return;
-    const playerData = (roundData.teams || []).find(t => t.player_id === playerId);
-    if (!playerData) {
-        document.getElementById('teams-summary').innerHTML = `<div class="col-span-3 card2 p-3 text-center text-[10px]" style="color:var(--muted)">No team data recorded for this round.</div>`;
-        document.getElementById('teams-picks-table').innerHTML = '';
-        return;
-    }
-
-    // Summary row
-    const totalPts  = playerData.total_points ?? '—';
-    const budget    = playerData.budget_remaining != null ? `$${playerData.budget_remaining}M` : '—';
-    const teamVal   = playerData.team_value != null ? `$${playerData.team_value}M` : '—';
-    const confirmed = roundData.confirmed;
-    document.getElementById('teams-updated-chip').textContent = roundData.confirmed ? 'Confirmed ✅' : 'Provisional 🔄';
-
-    document.getElementById('teams-summary').innerHTML = `
-        <div class="card p-3 text-center">
-            <div class="text-[8px] uppercase tracking-wide mb-1" style="color:var(--muted)">Total Pts</div>
-            <div class="fun text-lg" style="color:#2ec4b6">${totalPts}</div>
-        </div>
-        <div class="card p-3 text-center">
-            <div class="text-[8px] uppercase tracking-wide mb-1" style="color:var(--muted)">Team Value</div>
-            <div class="fun text-sm" style="color:#3a86ff">${teamVal}</div>
-        </div>
-        <div class="card p-3 text-center">
-            <div class="text-[8px] uppercase tracking-wide mb-1" style="color:var(--muted)">In Bank</div>
-            <div class="fun text-sm" style="color:#f4a100">${budget}</div>
-        </div>`;
-
-    // Picks table
-    const picks = playerData.picks || [];
-    const TEAM_TAG_COLORS_T = {
-        'MER':'#00d2be','FER':'#e8002d','RED':'#3671c6','MCL':'#ff8000',
-        'AMR':'#358c75','ALP':'#0093cc','WIL':'#005aff','HAA':'#888888',
-        'AUD':'#52e252','VRB':'#6692ff','CAD':'#cc0000',
-    };
-
-    const rows = picks.map(p => {
-        const tc       = TEAM_TAG_COLORS_T[p.team_tag] || '#9090b8';
-        const pts      = p.points ?? '—';
-        const price    = p.price != null ? `$${p.price}M` : '—';
-        const priceChg = p.price_change;
-        const chgStr   = priceChg != null
-            ? `<span style="color:${priceChg>0?'#2ec4b6':priceChg<0?'#ff4757':'var(--muted)'};font-size:8px;margin-left:3px">${priceChg>0?'+':''}${priceChg.toFixed(2)}</span>`
-            : '';
-        const ptsNum   = typeof pts === 'number' ? pts : 0;
-        const isStar   = p.is_star;
-        return `<tr class="border-b last:border-0 transition-colors" style="border-color:var(--border)"
-                    onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
-            <td class="p-3">
-                <div class="flex items-center gap-2">
-                    ${isStar ? '<span style="font-size:10px">⭐</span>' : '<span style="width:14px;display:inline-block"></span>'}
-                    <span style="background:${tc}22;color:${tc};font-size:9px;font-weight:bold;padding:2px 6px;border-radius:6px;font-family:\'Share Tech Mono\',monospace;">${p.short_name||p.name}</span>
-                    <span class="text-[9px]" style="color:var(--subtext)">${p.type==='constructor'?'🏗️':'🧑‍✈️'}</span>
-                </div>
-                ${p.team ? `<div class="text-[8px] mt-0.5 ml-9" style="color:${tc}">${p.team}</div>` : ''}
-            </td>
-            <td class="p-2 text-center font-mono text-[10px]" style="color:var(--subtext)">${price}${confirmed?chgStr:''}</td>
-            <td class="p-2 text-center font-mono text-[11px] font-bold" style="color:${ptsNum>0?'#2ec4b6':ptsNum<0?'#ff4757':'var(--subtext)'}">${pts}</td>
-        </tr>`;
-    }).join('');
-
-    document.getElementById('teams-picks-table').innerHTML = `
-    <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border)">
-        <span class="text-[8px] uppercase tracking-widest" style="color:var(--muted)">Drivers & Constructors · ${confirmed?'Final Points':'Provisional'}</span>
-    </div>
-    <table class="w-full">
-        <thead><tr class="border-b" style="background:var(--card2);border-color:var(--border)">
-            <th class="p-3 text-left text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Pick</th>
-            <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Price${confirmed?' / Δ':''}</th>
-            <th class="p-2 text-center text-[8px] uppercase tracking-wider font-normal" style="color:var(--muted)">Pts</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-    </table>`;
-}
-
-// ─── onDataStatChange — show/hide panels ────────────────────────
-function onDataStatChange() {
-    const v = document.getElementById('data-stat-select').value;
-    document.getElementById('data-budget-panel').style.display  = v === 'budget'  ? '' : 'none';
-    document.getElementById('data-fantasy-panel').style.display = v === 'fantasy' ? '' : 'none';
-    document.getElementById('data-teams-panel').style.display   = v === 'teams'   ? '' : 'none';
-    if (v === 'fantasy' && !F1_FANTASY) loadF1Fantasy();
-    if (v === 'teams'   && !F1_TEAMS)   loadF1Teams();
-}
 
 // ═══════════════════════════════════════════════════════════════════
 // NAVIGATION
@@ -1351,6 +897,7 @@ function navigate(page) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('page-' + page).classList.add('active');
     document.getElementById('nav-'  + page).classList.add('active');
+    // Lazy-load f1_data.json the first time the Data tab is opened
     if (page === 'data' && !F1_DATA) loadF1Data();
     window.scrollTo(0, 0);
 }
@@ -1359,8 +906,8 @@ function navigate(page) {
 // INIT
 // ═══════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    syncData();               // loads history.json → renders home/h2h
-    populateScheduleDropdown(); // schedule is static, render immediately
+    renderJuice();   // static, render immediately
+    syncData();      // loads history.json → renders everything else
 });
 </script>
 </body>

@@ -185,22 +185,37 @@ async def identify_and_scrape(table) -> tuple[str | None, list[dict]]:
             current_col_map     = {}
             current_pc_labels   = []
 
-            # col 0 = tag (DR/CR), col 1 = $ — always fixed
-            # Starting from col 2: scan for Rn labels then price-change labels
+            # IMPORTANT: The tier label cell has colspan=2 in the HTML,
+            # merging the tag (col 0) and price (col 1) columns visually.
+            # Playwright's inner_text() returns only ONE string for that
+            # merged cell, so the tier header row has one fewer item than
+            # data rows.
+            #
+            # tier header texts: ["Tier A (>=18.5M)", "R0", "R1", "-0.3", "-0.1", "+0.1", "+0.3"]
+            #   index:                0                  1     2     3       4       5       6
+            # data row texts:    ["VER",  "28",  "",   "50",  "≤-17", "-16",  "1",   "17"]
+            #   index:               0     1      2     3       4       5       6      7
+            #
+            # Therefore: tier_header_text[k]  →  data_col_index k+1  (for k >= 1)
+            #   "R0"  at tier_text[1] → data col 2
+            #   "R1"  at tier_text[2] → data col 3
+            #   "-0.3" at tier_text[3] → data col 4  ... etc.
+
             round_cols = []
             pc_cols    = []
-            for i, t in enumerate(texts[2:], start=2):
+            for k, t in enumerate(texts[1:], start=1):
+                data_col = k + 1   # offset by 1 because of colspan=2
                 if is_round_label(t):
-                    round_cols.append((i, t))
+                    round_cols.append((data_col, t))
                 elif is_price_change(t):
-                    pc_cols.append((i, t))
+                    pc_cols.append((data_col, t))
 
             current_col_map[0] = "name"
             current_col_map[1] = "price"
             for idx, lbl in round_cols:
-                current_col_map[idx] = lbl          # e.g. "R0", "R1", "R2"
+                current_col_map[idx] = lbl
             for idx, lbl in pc_cols:
-                current_col_map[idx] = lbl          # e.g. "-0.3", "+0.1"
+                current_col_map[idx] = lbl
             current_pc_labels = [lbl for _, lbl in pc_cols]
 
             print(f"  Tier {current_tier}: col_map={current_col_map}, pc_labels={current_pc_labels}")

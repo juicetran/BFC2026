@@ -383,6 +383,8 @@ async function syncF1Fantasy() {
         document.getElementById('fantasy-error').style.display = 'none';
     } catch(e) {
         console.warn('f1_fantasy.json not found:', e);
+        const errEl = document.getElementById('fantasy-error');
+        if (errEl) errEl.style.display = '';
     }
 }
 
@@ -409,21 +411,8 @@ function applyHistory(db) {
 
     populateRoundDropdowns();
 
-    // Update subtitle — prefer f1_teams data for current round label
-    const teamsRounds = getTeamsRelevantRounds();
-    if (teamsRounds.length) {
-        const lr = teamsRounds[teamsRounds.length - 1];
-        const schedR = F1_SCHEDULE.find(s => s.round === lr.round);
-        const gpName = schedR ? schedR.gp : (lr.gp || `Round ${lr.round}`);
-        const flag = GP_FLAGS[gpName] || '🏁';
-        const provTag = lr.confirmed ? '' : ' · 🔄';
-        document.getElementById('header-subtitle').textContent =
-            `2026 Season · R${String(lr.round).padStart(2,'0')} · ${gpName} ${flag}${provTag}`;
-    } else {
-        const latest = ROUNDS[ROUNDS.length - 1];
-        document.getElementById('header-subtitle').textContent =
-            `2026 Season · ${latest.key||'R0?'} · ${latest.gp||''} ${latest.flag||''}`;
-    }
+    // Update subtitle using schedule-aware function
+    updateHeaderSubtitle();
 
     renderStandings();
     renderH2H();
@@ -456,7 +445,7 @@ function populateHomeRoundDropdown() {
             o.textContent = `${flag} R${String(r.round).padStart(2,'0')} · ${gpName}${provTag}`;
             sSelect.appendChild(o);
         });
-        sSelect.value = 'r' + relevantRounds[relevantRounds.length - 1].round;
+        // Default to 'overall' — don't auto-select latest round
     } else {
         // Fallback to history ROUNDS
         [...ROUNDS].reverse().forEach(r => {
@@ -465,8 +454,10 @@ function populateHomeRoundDropdown() {
             o.textContent = r.label || `R${String(r.round).padStart(2,'0')} · ${r.gp}`;
             sSelect.appendChild(o);
         });
-        if (ROUNDS.length) sSelect.value = ROUNDS[ROUNDS.length - 1].round;
+        // Keep 'overall' as default even in fallback
     }
+    // Always reset to overall as default after rebuilding dropdown
+    sSelect.value = 'overall';
 }
 
 function populateRoundDropdowns() {
@@ -528,12 +519,36 @@ function getStandingsFromTeams(roundVal) {
     const roundData = (F1_TEAMS?.rounds || []).find(r => r.round === roundNum);
     if (!roundData) return [];
 
+    // Find previous confirmed round to compute per-round points as a diff
+    const allRounds = (F1_TEAMS?.rounds || []).sort((a,b) => a.round - b.round);
+    const prevRound = allRounds.filter(r => r.round < roundNum && r.confirmed).pop();
+
     const arr = (roundData.teams || [])
         .filter(t => t.picks?.length > 0)
         .map(t => {
             const key = PLAYER_ID_MAP[t.player_id] || t.player_id;
             const playerMeta = (F1_TEAMS.players||[]).find(p => p.id === t.player_id);
-            const pts = t.total_points ?? playerMeta?.cur_points ?? 0;
+
+            // Best source for this round's points:
+            // 1. t.round_points (per-round from API)
+            // 2. diff of cumulative - previous round cumulative
+            // 3. t.total_points (for R1 with no previous)
+            // 4. playerMeta.cur_points (overall fallback)
+            let pts = t.round_points;
+            if (pts == null && roundData.standings?.length) {
+                const standingEntry = roundData.standings.find(s => s.player_id === t.player_id);
+                if (standingEntry) {
+                    const cum = standingEntry.cumulative_points;
+                    if (cum != null && prevRound) {
+                        const prevStanding = prevRound.standings?.find(s => s.player_id === t.player_id);
+                        const prevCum = prevStanding?.cumulative_points ?? 0;
+                        pts = cum - prevCum;
+                    } else if (cum != null) {
+                        pts = cum; // R1: cumulative IS the round points
+                    }
+                }
+            }
+            if (pts == null) pts = t.total_points ?? playerMeta?.cur_points ?? 0;
             return { player_key: key, points: pts, team_value: t.team_value || 0, _teamData: t };
         }).sort((a,b) => b.points - a.points);
     return arr.map((s,i,a) => ({
@@ -668,8 +683,7 @@ function renderStandings() {
             <div class="text-[9px] mt-0.5" style="color:var(--muted)">${worstS?.points??'—'} pts</div>
         </div>`;
 
-    // Update weekly section to match the selected round
-    renderHomeWeeklyForRound(roundNum, roundData, gpName, roundFlag, isProvisional);
+    // Weekly picks section is now managed independently by renderHomeLatestRound()
 }
 
 function toggleTeamCard(header) {
@@ -681,9 +695,10 @@ function toggleTeamCard(header) {
 // RENDER — HOME WEEKLY — driven by renderStandings dropdown
 // ═══════════════════════════════════════════════════════════════════
 function renderHomeWeekly() {
-    // Called after f1_teams loads — just trigger a full re-render
+    // Called after f1_teams loads — rebuild dropdown + standings + latest round table
     populateHomeRoundDropdown();
     renderStandings();
+    renderHomeLatestRound(); // always show latest round below awards independently
 }
 
 function renderHomeWeeklyForRound(roundNum, roundData, gpName, roundFlag, isProvisional) {
@@ -692,7 +707,6 @@ function renderHomeWeeklyForRound(roundNum, roundData, gpName, roundFlag, isProv
     const table   = document.getElementById('home-weekly-table');
 
     if (!roundNum || !roundData) {
-        // Overall view — hide the weekly picks table
         section.style.display = 'none';
         return;
     }
@@ -703,10 +717,28 @@ function renderHomeWeeklyForRound(roundNum, roundData, gpName, roundFlag, isProv
     section.style.display = '';
     title.innerHTML = `${roundFlag} ${gpName} — Team Points${provLabel}`;
 
+    const allRounds = (F1_TEAMS?.rounds || []).sort((a,b) => a.round - b.round);
+    const prevRound = allRounds.filter(r => r.round < roundNum && r.confirmed).pop();
+
     const allTeams = (roundData.teams || []).filter(t => t.picks?.length > 0);
     const teamsWithPts = allTeams.map(t => {
+        // Compute this round's points via diff or direct field
+        let pts = t.round_points;
+        if (pts == null && roundData.standings?.length) {
+            const standingEntry = roundData.standings.find(s => s.player_id === t.player_id);
+            if (standingEntry) {
+                const cum = standingEntry.cumulative_points;
+                if (cum != null && prevRound) {
+                    const prevStanding = prevRound.standings?.find(s => s.player_id === t.player_id);
+                    pts = cum - (prevStanding?.cumulative_points ?? 0);
+                } else if (cum != null) {
+                    pts = cum;
+                }
+            }
+        }
         const playerMeta = (F1_TEAMS.players||[]).find(p => p.id === t.player_id);
-        return { ...t, _displayPts: t.total_points ?? playerMeta?.cur_points ?? null };
+        if (pts == null) pts = t.total_points ?? playerMeta?.cur_points ?? null;
+        return { ...t, _displayPts: pts };
     }).sort((a,b) => (b._displayPts??-9999) - (a._displayPts??-9999));
 
     if (!teamsWithPts.length) {
@@ -1317,8 +1349,99 @@ function renderBudgetTable() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SEED DATA (fallback if history.json not loaded)
+// HEADER SUBTITLE — shows active race weekend or next upcoming race
 // ═══════════════════════════════════════════════════════════════════
+function updateHeaderSubtitle() {
+    const nowUtc = new Date();
+    // Need F1_SCHEDULE and buildSessions — safe to call after DOMContentLoaded
+    if (typeof F1_SCHEDULE === 'undefined') return;
+
+    // Check if currently inside a race weekend (FP1 started → race end + 5h buffer)
+    for (const r of F1_SCHEDULE) {
+        const sessions = buildSessions(r);
+        const fp1  = sessions[0];
+        const race = sessions[sessions.length - 1];
+        if (!fp1 || !race) continue;
+        const raceEnd = new Date(race.utcDate.getTime() + 5 * 3600000);
+        if (fp1.utcDate <= nowUtc && nowUtc <= raceEnd) {
+            const flag = GP_FLAGS[r.gp] || '🏁';
+            document.getElementById('header-subtitle').textContent =
+                `2026 Season · R${String(r.round).padStart(2,'0')} · ${r.gp} ${flag} 🔴`;
+            return;
+        }
+    }
+
+    // Not in a live weekend — find next upcoming race (first whose FP1 is in the future)
+    for (const r of F1_SCHEDULE) {
+        const sessions = buildSessions(r);
+        const fp1 = sessions[0];
+        if (fp1 && fp1.utcDate > nowUtc) {
+            const flag = GP_FLAGS[r.gp] || '🏁';
+            document.getElementById('header-subtitle').textContent =
+                `2026 Season · UPCOMING · R${String(r.round).padStart(2,'0')} · ${r.gp} ${flag}`;
+            return;
+        }
+    }
+
+    document.getElementById('header-subtitle').textContent = `2026 Season · Season Complete 🏁`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HOME — LATEST ROUND TABLE (always shows independently of dropdown)
+// Picks the best available round:
+//   • Active race weekend → that round (provisional if not yet confirmed)
+//   • Otherwise           → last confirmed round
+// ═══════════════════════════════════════════════════════════════════
+function renderHomeLatestRound() {
+    if (!F1_TEAMS) return;
+    const nowUtc = new Date();
+    let targetRound = null;
+    let isProvisional = false;
+
+    // 1. Active race weekend?
+    for (const r of F1_SCHEDULE) {
+        const sessions = buildSessions(r);
+        const fp1  = sessions[0];
+        const race = sessions[sessions.length - 1];
+        if (!fp1 || !race) continue;
+        const raceEnd = new Date(race.utcDate.getTime() + 5 * 3600000);
+        if (fp1.utcDate <= nowUtc && nowUtc <= raceEnd) {
+            const rd = (F1_TEAMS.rounds || []).find(rd =>
+                rd.round === r.round && rd.teams?.some(t => t.picks?.length > 0));
+            if (rd) { targetRound = rd; isProvisional = !rd.confirmed; }
+            break;
+        }
+    }
+
+    // 2. Last confirmed round (if no active race weekend)
+    if (!targetRound) {
+        const confirmed = (F1_TEAMS.rounds || [])
+            .filter(r => r.confirmed && r.teams?.some(t => t.picks?.length > 0))
+            .sort((a, b) => a.round - b.round);
+        if (confirmed.length) { targetRound = confirmed[confirmed.length - 1]; isProvisional = false; }
+    }
+
+    // 3. Fallback: last round with any picks (provisional)
+    if (!targetRound) {
+        const withPicks = (F1_TEAMS.rounds || [])
+            .filter(r => r.teams?.some(t => t.picks?.length > 0))
+            .sort((a, b) => a.round - b.round);
+        if (withPicks.length) { targetRound = withPicks[withPicks.length - 1]; isProvisional = !targetRound.confirmed; }
+    }
+
+    if (!targetRound) {
+        document.getElementById('home-weekly-section').style.display = 'none';
+        return;
+    }
+
+    const schedRound = F1_SCHEDULE.find(s => s.round === targetRound.round);
+    const gpName = schedRound ? schedRound.gp : (targetRound.gp || `Round ${targetRound.round}`);
+    const roundFlag = GP_FLAGS[gpName] || '🏁';
+
+    renderHomeWeeklyForRound(targetRound.round, targetRound, gpName, roundFlag, isProvisional);
+}
+
+
 const SEED_ROUND = {
     round:1,key:'R01',label:'R01 · Australian GP 🇦🇺',flag:'🇦🇺',gp:'Australian GP',date:'2026-03-16',
     standings:[
@@ -1442,6 +1565,7 @@ function navigate(page) {
 document.addEventListener('DOMContentLoaded', () => {
     syncAll();
     populateScheduleDropdown();
+    updateHeaderSubtitle();
 });
 </script>
 </body>

@@ -1,27 +1,32 @@
 """
 f1_fantasy_sync.py
 ──────────────────
-Single source of truth sync. Writes ONE file: f1_teams.json
+Dual-file sync. Writes TWO files:
 
-Output structure:
-  f1_teams.json
-  ├── last_updated
-  ├── league_id / league_name
-  ├── f1_players              — all drivers + constructors (replaces f1_fantasy.json)
-  │   ├── drivers[]
+  history.json   ← append-only permanent archive of every confirmed round
+  f1_teams.json  ← live snapshot: current prices + overall standings + active/upcoming picks only
+
+history.json format (mirrors seed $RATXXXX.json, extended with teams[]/drivers[]/constructors[]):
+  ├── _meta             — league metadata + season
+  ├── rounds[]          — one entry per CONFIRMED round (never overwritten once written)
+  │   ├── round, key, label, flag, gp, date, confirmed=true
+  │   ├── standings[]   — points/race_points/cumulative_points per player
+  │   ├── teams[]       — full picks per player (same schema as f1_teams rounds.teams[])
+  │   ├── drivers[]     — F1 player-pool snapshot (LATEST confirmed round only)
   │   └── constructors[]
-  ├── players[]               — league members with display metadata
-  └── rounds[]
-      ├── round, gp, date, confirmed
-      ├── standings[]         — per-round league standings
-      │   └── player_id, player_key, round_points, cumulative_points, team_value
-      └── teams[]             — per-player picks
-          └── player_id, player_key, round_points, cumulative_points,
-              team_value, budget_remaining, picks[]
+  └── players{}         — display metadata (name/owner/emoji/color)
 
-KEY LOGIC:
-  round_points = cumulative_at_this_round - cumulative_at_previous_round
-  Round 1: round_points == cumulative_points (no previous round exists)
+f1_teams.json format (slim live snapshot only):
+  ├── last_updated / league_id / league_name
+  ├── f1_players              — CURRENT driver + constructor prices & points
+  ├── players[]               — overall standings (cur_points / cur_rank)
+  └── rounds[]                — ONLY the current live/upcoming round (unconfirmed picks + prov pts)
+                                 OR the latest confirmed round when between race weekends
+
+KEY RULES:
+  • confirmed rounds → archived once to history.json, NEVER re-fetched or modified
+  • f1_teams.json.rounds[] contains at most 1-2 entries (the live/next round only)
+  • history.json is the source of truth for all confirmed historical data
 
 AUTH: scripts/f1_session.json  →  { "guid": "...", "raw_cookies": "..." }
 REQUIRES: pip install httpx
@@ -37,10 +42,11 @@ from urllib.parse import unquote
 
 import httpx
 
-BASE        = "https://fantasy.formula1.com"
-SESSION_FILE = Path(__file__).parent / "f1_session.json"
-LEAGUE_ID   = os.environ.get("F1_FANTASY_LEAGUE_ID", "")
-OUTPUT_FILE = Path(__file__).parent.parent / "f1_teams.json"
+BASE          = "https://fantasy.formula1.com"
+SESSION_FILE  = Path(__file__).parent / "f1_session.json"
+LEAGUE_ID     = os.environ.get("F1_FANTASY_LEAGUE_ID", "")
+OUTPUT_FILE   = Path(__file__).parent.parent / "f1_teams.json"
+HISTORY_FILE  = Path(__file__).parent.parent / "history.json"
 
 # ── Map F1 Fantasy social_id → internal player key ───────────────────────────
 PLAYER_MAP = {
@@ -74,6 +80,14 @@ GP_NAMES = {
    19: "United States Grand Prix",20: "Mexico City Grand Prix",
    21: "São Paulo Grand Prix",   22: "Las Vegas Grand Prix",
    23: "Qatar Grand Prix",       24: "Abu Dhabi Grand Prix",
+}
+
+# ── GP flag emojis ────────────────────────────────────────────────────────────
+GP_FLAGS = {
+    1:"🇦🇺", 2:"🇨🇳", 3:"🇯🇵", 4:"🇧🇭", 5:"🇸🇦", 6:"🇺🇸",
+    7:"🇨🇦", 8:"🇲🇨", 9:"🇪🇸",10:"🇦🇹",11:"🇬🇧",12:"🇧🇪",
+   13:"🇭🇺",14:"🇳🇱",15:"🇮🇹",16:"🇪🇸",17:"🇦🇿",18:"🇸🇬",
+   19:"🇺🇸",20:"🇲🇽",21:"🇧🇷",22:"🇺🇸",23:"🇶🇦",24:"🇦🇪",
 }
 
 
@@ -111,7 +125,7 @@ def headers(raw_cookies: str) -> dict:
         "accept-language":    "en-US,en;q=0.9",
         "referer":            "https://fantasy.formula1.com/en/",
         "user-agent":         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "sec-ch-ua":          '"Not-A.Brand";v="99", "Chromium";v="124"',
+        "sec-ch-ua":          '"' + 'Not-A.Brand' + '";v="99", "Chromium";v="124"',
         "sec-ch-ua-mobile":   "?0",
         "sec-ch-ua-platform": '"Windows"',
         "sec-fetch-dest":     "empty",
@@ -145,10 +159,20 @@ async def get(client: httpx.AsyncClient, url: str, label: str = "") -> dict:
 def load_existing() -> dict:
     if OUTPUT_FILE.exists():
         try:
-            return json.loads(OUTPUT_FILE.read_text())
+            return json.loads(OUTPUT_FILE.read_text(encoding='utf-8'))
         except Exception:
             pass
     return {}
+
+
+def load_history() -> dict:
+    """Load history.json — the permanent archive of confirmed rounds."""
+    if HISTORY_FILE.exists():
+        try:
+            return json.loads(HISTORY_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    return {"_meta": {}, "rounds": [], "players": {}}
 
 
 def round_pts(cumul: float | None, prev: float | None) -> float | None:
@@ -156,6 +180,88 @@ def round_pts(cumul: float | None, prev: float | None) -> float | None:
     if cumul is None:
         return None
     return round(cumul - (prev or 0), 1)
+
+
+def has_valid_points(r: dict) -> bool:
+    """True if the round has real non-null point data (not all-null)."""
+    return any(
+        s.get("round_points") is not None
+        for s in r.get("standings", [])
+    )
+
+
+def history_round_to_teams_format(hr: dict) -> dict:
+    """Convert a history.json round entry back to f1_teams internal round format.
+    This allows history rounds to serve as the confirmed-round cache."""
+    standings = [
+        {
+            "player_id":         s.get("player_id", ""),
+            "player_key":        s["player_key"],
+            "round_points":      s.get("points") or s.get("race_points") or 0,
+            "cumulative_points": s.get("cumulative_points") or 0,
+            "team_value":        s.get("team_value") or 0,
+        }
+        for s in hr.get("standings", [])
+    ]
+    return {
+        "round":     hr["round"],
+        "gp":        hr.get("gp", f"Round {hr['round']}"),
+        "date":      hr.get("date", ""),
+        "confirmed": True,
+        "standings": standings,
+        "teams":     hr.get("teams", []),
+    }
+
+
+def build_history_round(
+    round_data: dict,
+    f1_players_snapshot: dict | None = None,
+) -> dict:
+    """Convert an f1_teams internal round to history.json archive format."""
+    rnum  = round_data["round"]
+    gp    = round_data.get("gp", f"Round {rnum}")
+    flag  = GP_FLAGS.get(rnum, "🏁")
+    date  = round_data.get("date", "")
+    label = f"R{str(rnum).zfill(2)} · {gp} {flag}"
+
+    teams = round_data.get("teams", [])
+    s_map = {s["player_id"]: s for s in round_data.get("standings", [])}
+
+    standings_out = []
+    for t in sorted(teams, key=lambda x: -(x.get("round_points") or 0)):
+        pid  = t["player_id"]
+        pkey = t["player_key"]
+        meta = PLAYER_META.get(pkey, {})
+        standings_out.append({
+            "player_id":         pid,
+            "player_key":        pkey,
+            "player_name":       meta.get("name", pkey),
+            "owner":             meta.get("owner", ""),
+            "points":            t.get("round_points") or 0,
+            "race_points":       t.get("round_points") or 0,
+            "cumulative_points": t.get("cumulative_points") or 0,
+            "team_value":        t.get("team_value") or 0,
+        })
+
+    entry: dict = {
+        "round":     rnum,
+        "key":       f"R{str(rnum).zfill(2)}",
+        "label":     label,
+        "flag":      flag,
+        "gp":        gp,
+        "date":      date,
+        "confirmed": True,
+        "standings": standings_out,
+        "teams":     teams,
+    }
+
+    # Include F1 player-pool snapshot only for the latest confirmed round,
+    # where points_this_gw accurately reflects that round's per-driver points.
+    if f1_players_snapshot:
+        entry["drivers"]      = f1_players_snapshot.get("drivers", [])
+        entry["constructors"] = f1_players_snapshot.get("constructors", [])
+
+    return entry
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -169,23 +275,24 @@ async def sync(force: bool = False):
         print("  ⚠️  --force: re-fetching all rounds (ignoring cache)")
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
-    existing = load_existing()
-    def has_valid_points(r: dict) -> bool:
-        """True if this confirmed round has real point data (not all-null)."""
-        return any(
-            s.get("round_points") is not None
-            for s in r.get("standings", [])
-        )
-
-    cached_confirmed: dict[int, dict] = {} if force else {
-        r["round"]: r
-        for r in existing.get("rounds", [])
-        if r.get("confirmed")
-        and any(t.get("picks") for t in r.get("teams", []))
-        and has_valid_points(r)
+    # ── Load history.json as the authoritative confirmed-round cache ──────────
+    existing_history  = load_history()
+    hist_rounds_map: dict[int, dict] = {
+        r["round"]: r for r in existing_history.get("rounds", [])
     }
+
+    # Build cached_confirmed (f1_teams internal format) from history.json.
+    # Golden rule: once a round is in history.json it is NEVER re-fetched.
+    cached_confirmed: dict[int, dict] = {}
+    if not force:
+        for rnum, hr in hist_rounds_map.items():
+            converted = history_round_to_teams_format(hr)
+            has_picks = any(t.get("picks") for t in converted.get("teams", []))
+            if has_picks and has_valid_points(converted):
+                cached_confirmed[rnum] = converted
+
     if cached_confirmed:
-        print(f"  Cached confirmed rounds: {sorted(cached_confirmed)}")
+        print(f"  Cached confirmed rounds (from history.json): {sorted(cached_confirmed)}")
 
     async with httpx.AsyncClient(headers=headers(raw_cookies), timeout=60, follow_redirects=True) as c:
 
@@ -210,9 +317,9 @@ async def sync(force: bool = False):
         # ── 2. F1 player pool ─────────────────────────────────────────────────
         print("  Fetching F1 player pool…")
         raw = await get(c, f"{BASE}/feeds/drivers/2_en.json", "f1-players")
-        drivers_out:   list[dict] = []
-        constrs_out:   list[dict] = []
-        player_lkp:    dict[str, dict] = {}
+        drivers_out:     list[dict] = []
+        constrs_out:     list[dict] = []
+        player_lkp:      dict[str, dict] = {}
         constructor_ids: set[str] = set()
 
         for pl in raw.get("Data", {}).get("Value", []):
@@ -238,6 +345,7 @@ async def sync(force: bool = False):
         # ── 3. Early exit if no league ID ─────────────────────────────────────
         if not LEAGUE_ID:
             print("  ⚠️  F1_FANTASY_LEAGUE_ID not set — only updating f1_players.")
+            existing = load_existing()
             out = {
                 "last_updated": ts,
                 "league_id":    "",
@@ -299,11 +407,11 @@ async def sync(force: bool = False):
         }
         print(f"  Completed rounds: {sorted(completed)}")
 
-        all_mdids = sorted(matchdays)
+        all_mdids  = sorted(matchdays)
         next_round = next((m for m in all_mdids if m not in completed), None)
 
-        # Only fetch rounds that are completed but not yet properly cached,
-        # plus the next upcoming round (for picks) — but ONLY if not already cached.
+        # Fetch rounds that are completed but not yet cached in history,
+        # plus the next upcoming round for picks preview.
         to_fetch: set[int] = {m for m in completed if m not in cached_confirmed}
         if next_round and next_round not in cached_confirmed:
             to_fetch.add(next_round)
@@ -311,24 +419,19 @@ async def sync(force: bool = False):
         print(f"  Fetching picks for rounds: {sorted(to_fetch) or 'none (all cached)'}")
 
         # ── 6. Build rounds ────────────────────────────────────────────────────
-        # overall_cur_pts: the true cumulative total for each player after ALL
-        # completed rounds so far. Used as the authoritative cumulative for the
-        # latest completed round (no future rounds have added to it yet).
         overall_cur_pts: dict[str, float] = {p["id"]: float(p.get("cur_points") or 0) for p in league_players}
 
-        prev_cumul: dict[str, float] = {}   # pid → last cumulative
-        rounds_out: list[dict] = []
+        prev_cumul:  dict[str, float] = {}
+        rounds_out:  list[dict] = []
 
         for mdid in all_mdids:
-            md  = matchdays.get(mdid, {"round": mdid, "gp": f"Round {mdid}", "date": "", "finished": False})
+            md        = matchdays.get(mdid, {"round": mdid, "gp": f"Round {mdid}", "date": "", "finished": False})
             confirmed = mdid in completed
 
-            # ── Reuse cached round — ALWAYS, if it has valid data ────────────
-            # Once a round is in cache with real points it is NEVER re-fetched.
-            # This prevents the API's stale ovpoints from overwriting good data.
+            # ── Reuse cached round from history — NEVER re-fetch ─────────────
             if mdid in cached_confirmed:
                 r = dict(cached_confirmed[mdid])
-                r["gp"] = md["gp"]  # refresh GP name in case override changed
+                r["gp"] = md["gp"]
                 rounds_out.append(r)
                 for s in r.get("standings", []):
                     prev_cumul[s["player_id"]] = s.get("cumulative_points") or 0
@@ -350,8 +453,6 @@ async def sync(force: bool = False):
             }
             cumul_this: dict[str, float] = {}
 
-            # No pre-round setup needed — cumulative built per-player from mdpoints below.
-
             for player in league_players:
                 pid    = player["id"]
                 p_guid = player.get("guid", "")
@@ -370,16 +471,10 @@ async def sync(force: bool = False):
                 team   = teams[0] if teams else {}
                 picks_raw = team.get("playerid", [])
 
-                # Cumulative strategy for confirmed rounds:
-                #   LATEST completed round → use cur_points (overall API total). This is
-                #     accurate because no future rounds have added to it yet.
-                #   OLDER rounds (shouldn't normally reach here since they're cached) →
-                #     try mdpoints; if absent, leave null and warn.
-                # round_points = cumulative_this - cumulative_prev (computed below).
                 is_latest = confirmed and (mdid == max(completed, default=0))
 
                 if confirmed and is_latest:
-                    cumul = overall_cur_pts.get(pid)   # cur_points = exact cumul for latest round
+                    cumul = overall_cur_pts.get(pid)
                 elif confirmed:
                     mdpts_raw = team.get("mdpoints")
                     if mdpts_raw is not None:
@@ -388,7 +483,6 @@ async def sync(force: bool = False):
                         print(f"    ⚠️  Older confirmed R{mdid} not cached and mdpoints missing for {player['name']}")
                         cumul = None
                 else:
-                    # Provisional round — not finalised yet.
                     cumul = None
 
                 prev_pts = prev_cumul.get(pid) or 0
@@ -408,7 +502,7 @@ async def sync(force: bool = False):
                         "type":         "constructor" if pk_id in constructor_ids else "driver",
                         "is_star":      bool(pk.get("iscaptain") or pk.get("ismgcaptain")),
                         "price":        ple.get("price", 0),
-                        "round_points": None,  # per-pick pts not available via this endpoint
+                        "round_points": None,
                     })
 
                 rec["teams"].append({
@@ -421,7 +515,6 @@ async def sync(force: bool = False):
                     "picks":             picks,
                 })
 
-            # Standings sorted by round_points (confirmed) or cumulative (provisional)
             sort_key = "round_points" if confirmed else "cumulative_points"
             rec["standings"] = sorted(
                 [
@@ -438,7 +531,6 @@ async def sync(force: bool = False):
                 reverse=True,
             )
 
-            # Advance cumulative tracker
             for pid, cv in cumul_this.items():
                 if cv:
                     prev_cumul[pid] = cv
@@ -446,19 +538,92 @@ async def sync(force: bool = False):
             rounds_out.append(rec)
             print(f"    ✓ {len(rec['teams'])} teams, confirmed={confirmed}")
 
-        # ── 7. Write ───────────────────────────────────────────────────────────
+        # ── 7. Archive newly confirmed rounds to history.json ─────────────────
+        # Only append rounds that are:
+        #   a) confirmed (mds==3)
+        #   b) NOT already in history.json (never overwrite)
+        latest_confirmed_num = max(completed, default=0)
+        new_history_rounds: list[dict] = []
+
+        for r in rounds_out:
+            rnum = r["round"]
+            if not r.get("confirmed"):
+                continue
+            if rnum in hist_rounds_map:
+                continue  # already archived — do NOT touch it
+            # New confirmed round: archive with optional f1_players snapshot
+            is_latest   = (rnum == latest_confirmed_num)
+            snapshot    = {"drivers": drivers_out, "constructors": constrs_out} if is_latest else None
+            new_history_rounds.append(build_history_round(r, snapshot))
+
+        if new_history_rounds:
+            all_history_rounds = sorted(
+                list(existing_history.get("rounds", [])) + new_history_rounds,
+                key=lambda r: r["round"],
+            )
+            players_meta = {
+                p["player_key"]: {
+                    "id":    p["player_key"],
+                    "name":  p["name"],
+                    "owner": p["owner"],
+                    "emoji": p["emoji"],
+                    "color": p["color"],
+                }
+                for p in league_players
+            }
+            updated_history = {
+                "_meta": {
+                    "league_id":        LEAGUE_ID,
+                    "league_name":      league_name,
+                    "season":           2026,
+                    "last_updated":     ts,
+                    "rounds_completed": len(completed),
+                },
+                "rounds":  all_history_rounds,
+                "players": players_meta,
+            }
+            HISTORY_FILE.write_text(
+                json.dumps(updated_history, indent=2, ensure_ascii=False), encoding='utf-8'
+            )
+            nums = [r["round"] for r in new_history_rounds]
+            print(f"\n✅ history.json  —  archived {len(new_history_rounds)} new round(s): {nums}")
+        else:
+            print("  history.json  —  no new confirmed rounds to archive")
+
+        # ── 8. Write slim f1_teams.json (live snapshot only) ──────────────────
+        # rounds[] contains ONLY:
+        #   • Unconfirmed/provisional rounds (live race weekend + provisional pts)
+        #   • If no live round: latest confirmed round (so current picks are browsable)
+        # All confirmed historical rounds live exclusively in history.json.
+        unconfirmed_rounds = [
+            r for r in rounds_out
+            if not r.get("confirmed") and r.get("teams")
+        ]
+        if not unconfirmed_rounds:
+            # Between race weekends: include latest confirmed round for team pick display
+            confirmed_with_picks = sorted(
+                [
+                    r for r in rounds_out
+                    if r.get("confirmed") and any(t.get("picks") for t in r.get("teams", []))
+                ],
+                key=lambda r: r["round"],
+            )
+            live_rounds = [confirmed_with_picks[-1]] if confirmed_with_picks else []
+        else:
+            live_rounds = unconfirmed_rounds
+
         out = {
             "last_updated": ts,
             "league_id":    LEAGUE_ID,
             "league_name":  league_name,
             "f1_players":   {"drivers": drivers_out, "constructors": constrs_out},
             "players":      league_players,
-            "rounds":       rounds_out,
+            "rounds":       live_rounds,
         }
         OUTPUT_FILE.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding='utf-8')
-        done = sum(1 for r in rounds_out if r.get("confirmed"))
-        print()
-        print(f"✅ f1_teams.json  —  {len(league_players)} players · {done}/{len(rounds_out)} rounds confirmed")
+
+        live_cnt = len(live_rounds)
+        print(f"✅ f1_teams.json  —  {len(league_players)} players · {live_cnt} live round(s) · {len(completed)} completed total")
 
 
 def main():
@@ -471,8 +636,6 @@ def main():
     print("F1 Fantasy Sync")
     print("=" * 40)
 
-    # Windows: use SelectorEventLoop to avoid ProactorEventLoop cleanup errors
-    # that cause a non-zero exit code even on successful runs.
     import platform
     if platform.system() == "Windows":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())

@@ -32,14 +32,14 @@ if errorlevel 1 goto :sync_failed
 
 echo.
 echo Pushing to GitHub...
-git add f1_teams.json
+git add f1_teams.json history.json
 git commit -m "data: sync f1 fantasy [skip ci]"
 git push
 if errorlevel 1 (
     echo.
     echo ============================================
     echo  WARNING: Git push failed.
-    echo  Data file was updated locally but NOT pushed.
+    echo  Data files were updated locally but NOT pushed.
     echo  Run manually: git push
     echo ============================================
     echo.
